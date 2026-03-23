@@ -22,6 +22,7 @@ export default function WhiteboardPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   const pendingCanvasDataRef = useRef<string | null>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     async function loadLesson() {
@@ -102,7 +103,19 @@ export default function WhiteboardPage() {
   const handleCanvasChange = useCallback((canvasData: string) => {
     pendingCanvasDataRef.current = canvasData;
     setHasUnsavedChanges(true);
-  }, []);
+    
+    // Clear existing auto-save timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    // Set new auto-save timeout (2 seconds after last change)
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      if (pendingCanvasDataRef.current) {
+        handleSave(pendingCanvasDataRef.current);
+      }
+    }, 2000);
+  }, [handleSave]);
 
   const getBackUrl = useCallback(() => {
     if (classId) {
@@ -116,18 +129,17 @@ export default function WhiteboardPage() {
 
   const backButtonText = classId || lesson?.class_id ? 'Back to Dashboard' : 'Back to Classes';
 
-  const handleBackClick = useCallback((e: React.MouseEvent) => {
-    if (hasUnsavedChanges) {
-      e.preventDefault();
-      const shouldSave = window.confirm(
-        'You have unsaved changes. Would you like to save before leaving?\n\nClick "OK" to save and leave, or "Cancel" to stay on this page.'
-      );
-      
-      if (shouldSave && pendingCanvasDataRef.current) {
-        handleSave(pendingCanvasDataRef.current).then(() => {
-          router.push(getBackUrl());
-        });
-      }
+  const handleBackClick = useCallback(() => {
+    // Clear any pending auto-save and save immediately if there are changes
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    if (hasUnsavedChanges && pendingCanvasDataRef.current) {
+      // Save before navigating
+      handleSave(pendingCanvasDataRef.current).then(() => {
+        router.push(getBackUrl());
+      });
     } else {
       router.push(getBackUrl());
     }
@@ -145,6 +157,15 @@ export default function WhiteboardPage() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
+
+  // Cleanup auto-save timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (isLoading) {
     return (
