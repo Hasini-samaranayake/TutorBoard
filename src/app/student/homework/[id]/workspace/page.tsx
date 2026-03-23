@@ -37,7 +37,7 @@ export default function StudentHomeworkWorkspacePage() {
   useEffect(() => {
     async function loadData() {
       const supabase = createClient();
-      const [{ data: hwData }, { data: resData }, { data: userRes }] = await Promise.all([
+      const [{ data: hwData }, { data: resData }, { data: authData }] = await Promise.all([
         supabase.from('homework').select('*').eq('id', params.id).single(),
         fetch(`/api/homework/resources?homeworkId=${params.id}`).then((r) => (r.ok ? r.json() : [])),
         supabase.auth.getUser(),
@@ -55,7 +55,7 @@ export default function StudentHomeworkWorkspacePage() {
         setSelectedResourceId(resourcesList[0].id);
       }
 
-      const userId = userRes.data.user?.id;
+      const userId = authData.user?.id;
       if (userId) {
         const { data: existingSubmission } = await supabase
           .from('homework_submissions')

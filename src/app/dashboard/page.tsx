@@ -205,14 +205,20 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <a
-                    href={submission.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    View
-                  </a>
+                  {submission.file_url ? (
+                    <a
+                      href={submission.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      View
+                    </a>
+                  ) : (
+                    <span className="text-sm text-gray-500">
+                      Annotated submission
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

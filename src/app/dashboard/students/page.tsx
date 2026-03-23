@@ -228,15 +228,21 @@ export default function StudentsPage() {
                             {format(new Date(sub.submitted_at), 'MMM d, yyyy')}
                           </p>
                         </div>
-                        <a
-                          href={sub.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          View
-                        </a>
+                        {sub.file_url ? (
+                          <a
+                            href={sub.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            View
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-500">
+                            Annotated
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
