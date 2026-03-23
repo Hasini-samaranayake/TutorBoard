@@ -2,7 +2,7 @@
 
 A powerful whiteboard application designed specifically for private tutors to deliver engaging online lessons. Built with Next.js, Fabric.js, and Supabase.
 
-## Features
+## all Features
 
 ### For Teachers
 - **Interactive Whiteboard**: Draw, write, and explain concepts with pen, highlighter, shapes, and text tools
