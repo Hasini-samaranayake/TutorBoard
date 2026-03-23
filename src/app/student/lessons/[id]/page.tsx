@@ -5,13 +5,53 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import * as fabric from 'fabric';
 import { createClient } from '@/lib/supabase';
-import { Lesson, Annotation } from '@/types';
+import { Lesson, Annotation, WhiteboardPage } from '@/types';
 import Button from '@/components/ui/Button';
-import { ArrowLeft, Pencil, Highlighter, Eraser, Save, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Pencil, Highlighter, Eraser, Save, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { deserializeCanvas, createPenBrush, createHighlighterBrush, COLORS } from '@/lib/canvas-utils';
 
 type AnnotationTool = 'view' | 'pen' | 'highlighter' | 'eraser';
+
+function parseCanvasData(data: string | null): { pages: WhiteboardPage[]; currentPageIndex: number } {
+  if (!data) {
+    return { pages: [{ id: 'page-1', canvasData: '' }], currentPageIndex: 0 };
+  }
+
+  try {
+    const parsed = JSON.parse(data);
+    if (parsed.pages && Array.isArray(parsed.pages)) {
+      return {
+        pages: parsed.pages.length > 0 ? parsed.pages : [{ id: 'page-1', canvasData: '' }],
+        currentPageIndex: parsed.currentPageIndex || 0,
+      };
+    }
+
+    return { pages: [{ id: 'page-1', canvasData: data }], currentPageIndex: 0 };
+  } catch {
+    return { pages: [{ id: 'page-1', canvasData: data }], currentPageIndex: 0 };
+  }
+}
+
+function parseAnnotationData(data: string | null, defaultPageId: string): Record<string, unknown[]> {
+  if (!data) return {};
+
+  try {
+    const parsed = JSON.parse(data);
+
+    if (parsed.byPage && typeof parsed.byPage === 'object') {
+      return parsed.byPage as Record<string, unknown[]>;
+    }
+
+    if (Array.isArray(parsed)) {
+      return { [defaultPageId]: parsed };
+    }
+  } catch {
+    return {};
+  }
+
+  return {};
+}
 
 export default function StudentLessonViewPage() {
   const params = useParams();
@@ -23,11 +63,14 @@ export default function StudentLessonViewPage() {
   const [activeTool, setActiveTool] = useState<AnnotationTool>('view');
   const [activeColor, setActiveColor] = useState('#ef4444');
   const [showAnnotations, setShowAnnotations] = useState(true);
+  const [pages, setPages] = useState<WhiteboardPage[]>([]);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fabricRef = useRef<fabric.Canvas | null>(null);
   const annotationLayerRef = useRef<fabric.FabricObject[]>([]);
+  const annotationByPageRef = useRef<Record<string, unknown[]>>({});
 
   useEffect(() => {
     async function loadLesson() {
@@ -54,7 +97,19 @@ export default function StudentLessonViewPage() {
         return;
       }
 
+      const parsedCanvasData = parseCanvasData(lessonData?.canvas_data || null);
+      const normalizedCurrentPageIndex = Math.min(
+        parsedCanvasData.currentPageIndex,
+        Math.max(parsedCanvasData.pages.length - 1, 0)
+      );
+
       setLesson(lessonData);
+      setPages(parsedCanvasData.pages);
+      setCurrentPageIndex(normalizedCurrentPageIndex);
+      annotationByPageRef.current = parseAnnotationData(
+        annotationData?.annotation_data || null,
+        parsedCanvasData.pages[0]?.id || 'page-1'
+      );
       setAnnotation(annotationData);
       setIsLoading(false);
     }
@@ -75,30 +130,6 @@ export default function StudentLessonViewPage() {
 
     fabricRef.current = canvas;
 
-    if (lesson.canvas_data) {
-      deserializeCanvas(canvas, lesson.canvas_data).then(() => {
-        canvas.forEachObject((obj) => {
-          obj.selectable = false;
-          obj.evented = false;
-        });
-
-        if (annotation?.annotation_data) {
-          const annotationObjects = JSON.parse(annotation.annotation_data);
-          fabric.util.enlivenObjects(annotationObjects).then((objects) => {
-            objects.forEach((obj) => {
-              if (obj && 'set' in obj && typeof obj.set === 'function') {
-                const fabricObj = obj as fabric.FabricObject;
-                fabricObj.set({ selectable: false, evented: false });
-                canvas.add(fabricObj);
-                annotationLayerRef.current.push(fabricObj);
-              }
-            });
-            canvas.renderAll();
-          });
-        }
-      });
-    }
-
     const handleResize = () => {
       canvas.setDimensions({
         width: container.clientWidth,
@@ -113,7 +144,49 @@ export default function StudentLessonViewPage() {
       window.removeEventListener('resize', handleResize);
       canvas.dispose();
     };
-  }, [lesson, annotation]);
+  }, [lesson]);
+
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    const currentPage = pages[currentPageIndex];
+    if (!canvas || !currentPage) return;
+
+    annotationLayerRef.current = [];
+    canvas.clear();
+    canvas.backgroundColor = '#ffffff';
+
+    const loadPage = async () => {
+      if (currentPage.canvasData) {
+        await deserializeCanvas(canvas, currentPage.canvasData);
+      } else {
+        canvas.renderAll();
+      }
+
+      canvas.forEachObject((obj) => {
+        obj.selectable = false;
+        obj.evented = false;
+      });
+
+      const pageAnnotations = annotationByPageRef.current[currentPage.id] || [];
+      if (pageAnnotations.length > 0) {
+        const objects = await fabric.util.enlivenObjects(pageAnnotations);
+        objects.forEach((obj) => {
+          if (obj && 'set' in obj && typeof obj.set === 'function') {
+            const fabricObj = obj as fabric.FabricObject;
+            fabricObj.set({ selectable: false, evented: false, visible: showAnnotations });
+            canvas.add(fabricObj);
+            annotationLayerRef.current.push(fabricObj);
+          }
+        });
+      }
+
+      canvas.renderAll();
+    };
+
+    loadPage().catch((error) => {
+      console.error('Error loading whiteboard page:', error);
+    });
+  }, [pages, currentPageIndex, showAnnotations]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
@@ -178,16 +251,22 @@ export default function StudentLessonViewPage() {
   }, [activeTool]);
 
   const handleSaveAnnotations = useCallback(async () => {
-    if (!fabricRef.current || !lesson) return;
+    if (!fabricRef.current || !lesson || !pages[currentPageIndex]) return;
 
     setIsSaving(true);
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const annotationData = JSON.stringify(
-      annotationLayerRef.current.map(obj => obj.toObject())
-    );
+    const currentPageId = pages[currentPageIndex].id;
+    annotationByPageRef.current = {
+      ...annotationByPageRef.current,
+      [currentPageId]: annotationLayerRef.current.map((obj) => obj.toObject()),
+    };
+
+    const annotationData = JSON.stringify({
+      byPage: annotationByPageRef.current,
+    });
 
     try {
       if (annotation) {
@@ -214,7 +293,7 @@ export default function StudentLessonViewPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [lesson, annotation]);
+  }, [lesson, annotation, pages, currentPageIndex]);
 
   const toggleAnnotationsVisibility = () => {
     const canvas = fabricRef.current;
@@ -227,6 +306,14 @@ export default function StudentLessonViewPage() {
       obj.visible = newVisibility;
     });
     canvas.renderAll();
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPageIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  const goToNextPage = () => {
+    setCurrentPageIndex((prev) => Math.min(prev + 1, pages.length - 1));
   };
 
   if (isLoading) {
@@ -311,6 +398,30 @@ export default function StudentLessonViewPage() {
                 style={{ backgroundColor: color }}
               />
             ))}
+          </div>
+
+          <div className="h-6 w-px bg-gray-200 mx-2" />
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={goToPreviousPage}
+              disabled={currentPageIndex === 0}
+              className="p-2 rounded-lg transition-colors hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Previous Page"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-sm text-gray-600 min-w-[90px] text-center">
+              Page {currentPageIndex + 1} of {Math.max(pages.length, 1)}
+            </span>
+            <button
+              onClick={goToNextPage}
+              disabled={currentPageIndex >= pages.length - 1}
+              className="p-2 rounded-lg transition-colors hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Next Page"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
 
           <div className="h-6 w-px bg-gray-200 mx-2" />
