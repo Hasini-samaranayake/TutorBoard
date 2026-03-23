@@ -2,13 +2,21 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 
 async function isTeacherForHomework(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, userId: string, homeworkId: string) {
-  const { data } = await supabase
+  const { data: homework } = await supabase
     .from('homework')
-    .select('id, lesson:lessons!inner(teacher_id)')
+    .select('lesson_id')
     .eq('id', homeworkId)
-    .eq('lesson.teacher_id', userId)
     .single();
-  return !!data;
+  if (!homework) return false;
+
+  const { data: lesson } = await supabase
+    .from('lessons')
+    .select('id')
+    .eq('id', homework.lesson_id)
+    .eq('teacher_id', userId)
+    .single();
+
+  return !!lesson;
 }
 
 export async function GET(request: Request) {

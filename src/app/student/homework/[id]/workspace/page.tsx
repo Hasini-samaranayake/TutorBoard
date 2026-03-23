@@ -32,6 +32,7 @@ export default function StudentHomeworkWorkspacePage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [lastDraftSavedAt, setLastDraftSavedAt] = useState<string | null>(null);
   const [pdfPage, setPdfPage] = useState(1);
+  const [editorVersion, setEditorVersion] = useState(0);
 
   const selectedResource = useMemo(
     () => resources.find((r) => r.id === selectedResourceId) || null,
@@ -87,7 +88,10 @@ export default function StudentHomeworkWorkspacePage() {
         if (existingSubmission) {
           setSubmission(existingSubmission as HomeworkSubmission);
           const parsed = parseAnnotationPayload(existingSubmission.annotation_data);
-          if (parsed.whiteboardData) setAnnotationData(parsed.whiteboardData);
+          if (parsed.whiteboardData) {
+            setAnnotationData(parsed.whiteboardData);
+            setEditorVersion((v) => v + 1);
+          }
           setIsSubmitted(parsed.submitted || existingSubmission.submission_type === 'file_upload');
           setLastDraftSavedAt(parsed.savedAt);
           if (existingSubmission.source_resource_id) {
@@ -120,7 +124,10 @@ export default function StudentHomeworkWorkspacePage() {
   }, [selectedResourceId]);
 
   const saveAnnotated = async (finalSubmit: boolean) => {
-    if (!homework || !selectedResource || !annotationData) return;
+    if (!homework || !selectedResource || !annotationData) {
+      alert('Please select an assigned resource and add annotations before saving.');
+      return;
+    }
     if (finalSubmit) {
       setIsSubmittingFinal(true);
     } else {
@@ -191,7 +198,11 @@ export default function StudentHomeworkWorkspacePage() {
           <Button variant="secondary" onClick={() => saveAnnotated(false)} isLoading={isSavingDraft}>
             Save Draft
           </Button>
-          <Button onClick={() => saveAnnotated(true)} isLoading={isSubmittingFinal} disabled={isSubmitted}>
+          <Button
+            onClick={() => saveAnnotated(true)}
+            isLoading={isSubmittingFinal}
+            disabled={isSubmitted || resources.length === 0}
+          >
             {isSubmitted ? 'Submitted' : 'Submit Final'}
           </Button>
         </div>
@@ -201,15 +212,19 @@ export default function StudentHomeworkWorkspacePage() {
         <Card className="p-4 min-h-0 flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-medium text-gray-900">Tutor Resource</h2>
-            <select
-              value={selectedResourceId || ''}
-              onChange={(e) => setSelectedResourceId(e.target.value)}
-              className="px-3 py-2 border rounded-lg text-sm"
-            >
-              {resources.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
+            {resources.length > 0 ? (
+              <select
+                value={selectedResourceId || ''}
+                onChange={(e) => setSelectedResourceId(e.target.value)}
+                className="px-3 py-2 border rounded-lg text-sm"
+              >
+                {resources.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-sm text-gray-500">No resource attached</span>
+            )}
           </div>
 
           {selectedResource && selectedResource.mime_type.includes('pdf') && (
@@ -234,7 +249,11 @@ export default function StudentHomeworkWorkspacePage() {
 
           <div className="flex-1 border rounded-lg overflow-hidden bg-gray-100">
             {!selectedResourceUrl && !resourceLoadError && (
-              <div className="p-6 text-center text-gray-500">No resource selected</div>
+              <div className="p-6 text-center text-gray-500">
+                {resources.length === 0
+                  ? 'No resource has been attached to this homework yet.'
+                  : 'No resource selected'}
+              </div>
             )}
             {resourceLoadError && (
               <div className="p-6 text-center text-red-600">{resourceLoadError}</div>
@@ -254,6 +273,7 @@ export default function StudentHomeworkWorkspacePage() {
 
         <Card className="p-0 min-h-0 overflow-hidden">
           <Whiteboard
+            key={`${selectedResourceId || 'none'}-${editorVersion}`}
             initialData={annotationData || undefined}
             onChange={setAnnotationData}
             initialTemplate="blank"

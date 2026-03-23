@@ -31,6 +31,7 @@ export default function HomeworkPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [resourceFiles, setResourceFiles] = useState<File[]>([]);
   const [resourcePageCounts, setResourcePageCounts] = useState<Record<string, number>>({});
+  const [resourceUploadError, setResourceUploadError] = useState<string | null>(null);
   const resourceInputRef = useRef<HTMLInputElement>(null);
   const [newHomework, setNewHomework] = useState({
     lesson_id: '',
@@ -77,6 +78,7 @@ export default function HomeworkPage() {
     if (!newHomework.lesson_id || !newHomework.description || !newHomework.due_date) return;
 
     setIsCreating(true);
+    setResourceUploadError(null);
     const supabase = createClient();
     const { data, error } = await supabase
       .from('homework')
@@ -87,6 +89,7 @@ export default function HomeworkPage() {
     if (!error && data) {
       const created = data as HomeworkWithLesson;
       const uploadedResources: HomeworkResource[] = [];
+      let failedUploads = 0;
       for (const file of resourceFiles) {
         const formData = new FormData();
         formData.append('homeworkId', created.id);
@@ -99,6 +102,8 @@ export default function HomeworkPage() {
         if (response.ok) {
           const resource = await response.json() as HomeworkResource;
           uploadedResources.push(resource);
+        } else {
+          failedUploads++;
         }
       }
 
@@ -107,6 +112,11 @@ export default function HomeworkPage() {
       setNewHomework({ lesson_id: '', description: '', due_date: '' });
       setResourceFiles([]);
       setResourcePageCounts({});
+      if (failedUploads > 0) {
+        setResourceUploadError(`${failedUploads} resource upload(s) failed. You can still edit this homework and re-upload.`);
+      }
+    } else if (error) {
+      setResourceUploadError('Failed to create homework. Please try again.');
     }
     setIsCreating(false);
   };
@@ -349,6 +359,9 @@ export default function HomeworkPage() {
                     );
                   })}
                 </div>
+              )}
+              {resourceUploadError && (
+                <p className="mt-3 text-sm text-red-600">{resourceUploadError}</p>
               )}
             </div>
           </div>
