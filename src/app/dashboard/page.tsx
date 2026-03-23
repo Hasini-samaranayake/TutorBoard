@@ -154,7 +154,7 @@ export default function DashboardPage() {
               {recentLessons.map((lesson) => (
                 <Link
                   key={lesson.id}
-                  href={`/whiteboard/${lesson.id}`}
+                  href={`/whiteboard/${lesson.id}?class=${classId}`}
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center gap-3">

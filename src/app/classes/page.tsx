@@ -13,8 +13,12 @@ import {
   Copy, 
   Check,
   LogIn,
-  GraduationCap
+  GraduationCap,
+  MoreVertical,
+  Pencil,
+  Trash2
 } from 'lucide-react';
+import Modal from '@/components/ui/Modal';
 
 interface ClassData {
   id: string;
@@ -49,10 +53,26 @@ export default function ClassesPage() {
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [editingClass, setEditingClass] = useState<ClassData | null>(null);
+  const [editClassName, setEditClassName] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [deletingClass, setDeletingClass] = useState<ClassData | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (openMenuId && !(e.target as Element).closest('.class-menu')) {
+        setOpenMenuId(null);
+      }
+    }
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openMenuId]);
 
   async function loadData() {
     const supabase = createClient();
@@ -196,6 +216,69 @@ export default function ClassesPage() {
     setTimeout(() => setCopiedCode(null), 2000);
   }
 
+  function handleEditClick(cls: ClassData) {
+    setEditingClass(cls);
+    setEditClassName(cls.name);
+    setOpenMenuId(null);
+  }
+
+  function handleDeleteClick(cls: ClassData) {
+    setDeletingClass(cls);
+    setOpenMenuId(null);
+  }
+
+  async function handleEditClass(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingClass || !editClassName.trim()) return;
+
+    setIsEditing(true);
+    const supabase = createClient();
+
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .update({ name: editClassName.trim() })
+        .eq('id', editingClass.id);
+
+      if (error) throw error;
+
+      setClasses(prev => prev.map(cls => 
+        cls.id === editingClass.id ? { ...cls, name: editClassName.trim() } : cls
+      ));
+      setEditingClass(null);
+      setEditClassName('');
+    } catch (error) {
+      console.error('Error updating class:', error);
+      alert('Failed to update class. Please try again.');
+    } finally {
+      setIsEditing(false);
+    }
+  }
+
+  async function handleDeleteClass() {
+    if (!deletingClass) return;
+
+    setIsDeleting(true);
+    const supabase = createClient();
+
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', deletingClass.id);
+
+      if (error) throw error;
+
+      setClasses(prev => prev.filter(cls => cls.id !== deletingClass.id));
+      setDeletingClass(null);
+    } catch (error) {
+      console.error('Error deleting class:', error);
+      alert('Failed to delete class. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   function openClass(classId: string) {
     if (profile?.role === 'teacher') {
       window.location.href = `/dashboard?class=${classId}`;
@@ -257,6 +340,20 @@ export default function ClassesPage() {
             copyJoinCode={copyJoinCode}
             copiedCode={copiedCode}
             openClass={openClass}
+            openMenuId={openMenuId}
+            setOpenMenuId={setOpenMenuId}
+            onEditClick={handleEditClick}
+            onDeleteClick={handleDeleteClick}
+            editingClass={editingClass}
+            setEditingClass={setEditingClass}
+            editClassName={editClassName}
+            setEditClassName={setEditClassName}
+            isEditing={isEditing}
+            handleEditClass={handleEditClass}
+            deletingClass={deletingClass}
+            setDeletingClass={setDeletingClass}
+            isDeleting={isDeleting}
+            handleDeleteClass={handleDeleteClass}
           />
         ) : (
           <StudentView
@@ -285,6 +382,20 @@ function TeacherView({
   copyJoinCode,
   copiedCode,
   openClass,
+  openMenuId,
+  setOpenMenuId,
+  onEditClick,
+  onDeleteClick,
+  editingClass,
+  setEditingClass,
+  editClassName,
+  setEditClassName,
+  isEditing,
+  handleEditClass,
+  deletingClass,
+  setDeletingClass,
+  isDeleting,
+  handleDeleteClass,
 }: {
   classes: ClassData[];
   showCreateModal: boolean;
@@ -296,6 +407,20 @@ function TeacherView({
   copyJoinCode: (code: string) => void;
   copiedCode: string | null;
   openClass: (id: string) => void;
+  openMenuId: string | null;
+  setOpenMenuId: (id: string | null) => void;
+  onEditClick: (cls: ClassData) => void;
+  onDeleteClick: (cls: ClassData) => void;
+  editingClass: ClassData | null;
+  setEditingClass: (cls: ClassData | null) => void;
+  editClassName: string;
+  setEditClassName: (name: string) => void;
+  isEditing: boolean;
+  handleEditClass: (e: React.FormEvent) => void;
+  deletingClass: ClassData | null;
+  setDeletingClass: (cls: ClassData | null) => void;
+  isDeleting: boolean;
+  handleDeleteClass: () => void;
 }) {
   return (
     <>
@@ -374,6 +499,41 @@ function TeacherView({
                     </span>
                   </div>
                 </div>
+                <div className="relative class-menu">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(openMenuId === cls.id ? null : cls.id);
+                    }}
+                    className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <MoreVertical className="w-5 h-5 text-gray-500" />
+                  </button>
+                  {openMenuId === cls.id && (
+                    <div className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 min-w-[140px]">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditClick(cls);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        Rename
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteClick(cls);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                 <div>
@@ -399,6 +559,79 @@ function TeacherView({
           ))}
         </div>
       )}
+
+      <Modal
+        isOpen={!!editingClass}
+        onClose={() => {
+          setEditingClass(null);
+          setEditClassName('');
+        }}
+        title="Rename Class"
+      >
+        <form onSubmit={handleEditClass}>
+          <Input
+            id="editClassName"
+            label="Class Name"
+            value={editClassName}
+            onChange={(e) => setEditClassName(e.target.value)}
+            placeholder="Enter class name"
+            required
+          />
+          <div className="flex gap-3 mt-6">
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              onClick={() => {
+                setEditingClass(null);
+                setEditClassName('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1" isLoading={isEditing}>
+              Save
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={!!deletingClass}
+        onClose={() => setDeletingClass(null)}
+        title="Delete Class"
+      >
+        <div className="text-center">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Trash2 className="w-6 h-6 text-red-600" />
+          </div>
+          <p className="text-gray-600 mb-2">
+            Are you sure you want to delete <strong>{deletingClass?.name}</strong>?
+          </p>
+          <p className="text-sm text-gray-500 mb-6">
+            This will remove all lessons, homework, and student enrollments associated with this class. This action cannot be undone.
+          </p>
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              onClick={() => setDeletingClass(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              className="flex-1"
+              isLoading={isDeleting}
+              onClick={handleDeleteClass}
+            >
+              Delete Class
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

@@ -12,6 +12,7 @@ interface WhiteboardProps {
   initialData?: string;
   initialTemplate?: WhiteboardTemplate;
   onSave?: (data: string) => void;
+  onChange?: (data: string) => void;
   readOnly?: boolean;
 }
 
@@ -37,7 +38,7 @@ function parseInitialData(data: string | undefined): { pages: WhiteboardPage[], 
 
 const DEFAULT_STROKE_WIDTH = 4;
 
-export default function Whiteboard({ initialData, initialTemplate = 'blank', onSave, readOnly = false }: WhiteboardProps) {
+export default function Whiteboard({ initialData, initialTemplate = 'blank', onSave, onChange, readOnly = false }: WhiteboardProps) {
   const [activeTool, setActiveTool] = useState<WhiteboardTool>('pen');
   const [activeColor, setActiveColor] = useState('#000000');
   const [template, setTemplate] = useState<WhiteboardTemplate>(initialTemplate);
@@ -74,6 +75,19 @@ export default function Whiteboard({ initialData, initialTemplate = 'blank', onS
     setCanUndo(undo);
     setCanRedo(redo);
   }, []);
+
+  const handleCanvasChange = useCallback(() => {
+    if (!onChange) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const currentCanvasData = serializeCanvas(canvas);
+    const updatedPages = [...pages];
+    updatedPages[currentPageIndex] = { ...updatedPages[currentPageIndex], canvasData: currentCanvasData };
+    
+    const data = JSON.stringify({ pages: updatedPages, currentPageIndex });
+    onChange(data);
+  }, [onChange, pages, currentPageIndex]);
 
   const handleUndo = useCallback(() => {
     const canvas = canvasRef.current;
@@ -310,6 +324,7 @@ export default function Whiteboard({ initialData, initialTemplate = 'blank', onS
         onCanvasReady={handleCanvasReady}
         onHistoryChange={handleHistoryChange}
         onToolChange={setActiveTool}
+        onCanvasChange={handleCanvasChange}
       />
       <EquationEditor
         isOpen={isEquationEditorOpen}

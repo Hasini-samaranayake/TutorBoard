@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { Lesson } from '@/types';
 import Whiteboard from '@/components/whiteboard/Whiteboard';
 import LessonTimer from '@/components/whiteboard/LessonTimer';
 import { ArrowLeft, Clock } from 'lucide-react';
-import Link from 'next/link';
 
 export default function WhiteboardPage() {
   const params = useParams();
@@ -20,6 +19,9 @@ export default function WhiteboardPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  const pendingCanvasDataRef = useRef<string | null>(null);
 
   useEffect(() => {
     async function loadLesson() {
@@ -88,13 +90,61 @@ export default function WhiteboardPage() {
       }
 
       setLastSaved(new Date());
+      setHasUnsavedChanges(false);
     } catch (error) {
       console.error('Error saving:', error);
       alert('Failed to save. Please try again.');
     } finally {
       setIsSaving(false);
     }
-  }, [params.id, router]);
+  }, [params.id, classId, router]);
+
+  const handleCanvasChange = useCallback((canvasData: string) => {
+    pendingCanvasDataRef.current = canvasData;
+    setHasUnsavedChanges(true);
+  }, []);
+
+  const getBackUrl = useCallback(() => {
+    if (classId) {
+      return `/dashboard?class=${classId}`;
+    }
+    if (lesson?.class_id) {
+      return `/dashboard?class=${lesson.class_id}`;
+    }
+    return '/classes';
+  }, [classId, lesson?.class_id]);
+
+  const backButtonText = classId || lesson?.class_id ? 'Back to Dashboard' : 'Back to Classes';
+
+  const handleBackClick = useCallback((e: React.MouseEvent) => {
+    if (hasUnsavedChanges) {
+      e.preventDefault();
+      const shouldSave = window.confirm(
+        'You have unsaved changes. Would you like to save before leaving?\n\nClick "OK" to save and leave, or "Cancel" to stay on this page.'
+      );
+      
+      if (shouldSave && pendingCanvasDataRef.current) {
+        handleSave(pendingCanvasDataRef.current).then(() => {
+          router.push(getBackUrl());
+        });
+      }
+    } else {
+      router.push(getBackUrl());
+    }
+  }, [hasUnsavedChanges, handleSave, router, getBackUrl]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   if (isLoading) {
     return (
@@ -108,13 +158,13 @@ export default function WhiteboardPage() {
     <div className="h-screen flex flex-col">
       <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link
-            href={classId ? `/dashboard?class=${classId}` : '/classes'}
+          <button
+            onClick={handleBackClick}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span>Back to Dashboard</span>
-          </Link>
+            <span>{backButtonText}</span>
+          </button>
           <div className="h-6 w-px bg-gray-200" />
           <h1 className="font-semibold text-gray-900">
             {lesson?.title || 'New Lesson'}
@@ -145,6 +195,7 @@ export default function WhiteboardPage() {
             initialData={lesson?.canvas_data || undefined}
             initialTemplate={(lesson?.template as 'blank' | 'graph' | 'lined' | 'coordinate') || 'blank'}
             onSave={handleSave}
+            onChange={handleCanvasChange}
           />
         </div>
         {showTimer && (

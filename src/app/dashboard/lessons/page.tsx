@@ -174,7 +174,7 @@ export default function LessonsPage() {
                 <Calendar className="w-4 h-4" />
                 <span>{format(new Date(lesson.lesson_date), 'MMMM d, yyyy')}</span>
               </div>
-              <Link href={`/whiteboard/${lesson.id}`}>
+              <Link href={`/whiteboard/${lesson.id}?class=${classId}`}>
                 <Button variant="secondary" className="w-full">
                   Open Whiteboard
                 </Button>

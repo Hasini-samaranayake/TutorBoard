@@ -24,6 +24,7 @@ interface CanvasProps {
   onCanvasReady: (canvas: fabric.Canvas) => void;
   onHistoryChange: (canUndo: boolean, canRedo: boolean) => void;
   onToolChange?: (tool: WhiteboardTool) => void;
+  onCanvasChange?: () => void;
 }
 
 export default function Canvas({
@@ -34,6 +35,7 @@ export default function Canvas({
   onCanvasReady,
   onHistoryChange,
   onToolChange,
+  onCanvasChange,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<fabric.Canvas | null>(null);
@@ -65,7 +67,8 @@ export default function Canvas({
     }
     
     onHistoryChange(historyIndexRef.current > 0, historyIndexRef.current < historyRef.current.length - 1);
-  }, [onHistoryChange]);
+    onCanvasChange?.();
+  }, [onHistoryChange, onCanvasChange]);
 
   useEffect(() => {
     if (!canvasRef.current || !containerRef.current) return;
