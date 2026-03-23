@@ -130,20 +130,8 @@ export default function WhiteboardPage() {
   const backButtonText = classId || lesson?.class_id ? 'Back to Dashboard' : 'Back to Classes';
 
   const handleBackClick = useCallback(() => {
-    // Clear any pending auto-save and save immediately if there are changes
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
-    
-    if (hasUnsavedChanges && pendingCanvasDataRef.current) {
-      // Save before navigating
-      handleSave(pendingCanvasDataRef.current).then(() => {
-        router.push(getBackUrl());
-      });
-    } else {
-      router.push(getBackUrl());
-    }
-  }, [hasUnsavedChanges, handleSave, router, getBackUrl]);
+    router.push(getBackUrl());
+  }, [router, getBackUrl]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
