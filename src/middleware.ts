@@ -40,13 +40,26 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const publicPaths = ['/', '/auth/login', '/auth/register', '/auth/callback'];
+  const publicPaths = ['/', '/auth/login', '/auth/register', '/auth/callback', '/auth/forgot-password'];
   const isPublicPath = publicPaths.some(path => request.nextUrl.pathname === path);
+  const pathname = request.nextUrl.pathname;
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
     return NextResponse.redirect(url);
+  }
+
+  if (user) {
+    const isDashboardOrStudent = pathname.startsWith('/dashboard') || pathname.startsWith('/student');
+    const hasClassParam = request.nextUrl.searchParams.has('class');
+    
+    if (isDashboardOrStudent && !hasClassParam) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/classes';
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

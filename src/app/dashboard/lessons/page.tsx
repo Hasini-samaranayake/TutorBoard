@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { Lesson } from '@/types';
 import Card from '@/components/ui/Card';
@@ -12,6 +13,9 @@ import { Plus, BookOpen, Calendar, Trash2, Edit2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function LessonsPage() {
+  const searchParams = useSearchParams();
+  const classId = searchParams.get('class');
+  
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [filteredLessons, setFilteredLessons] = useState<Lesson[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,7 +27,7 @@ export default function LessonsPage() {
 
   useEffect(() => {
     loadLessons();
-  }, []);
+  }, [classId]);
 
   useEffect(() => {
     const filtered = lessons.filter(lesson =>
@@ -33,6 +37,8 @@ export default function LessonsPage() {
   }, [searchQuery, lessons]);
 
   async function loadLessons() {
+    if (!classId) return;
+    
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -41,6 +47,7 @@ export default function LessonsPage() {
       .from('lessons')
       .select('*')
       .eq('teacher_id', user.id)
+      .eq('class_id', classId)
       .order('lesson_date', { ascending: false });
 
     if (!error && data) {
@@ -103,7 +110,7 @@ export default function LessonsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Lessons</h1>
           <p className="text-gray-600">Manage your lesson whiteboards</p>
         </div>
-        <Link href="/whiteboard/new">
+        <Link href={`/whiteboard/new?class=${classId}`}>
           <Button>
             <Plus className="w-5 h-5 mr-2" />
             New Lesson
@@ -132,7 +139,7 @@ export default function LessonsPage() {
             {searchQuery ? 'Try a different search term' : 'Create your first lesson to get started'}
           </p>
           {!searchQuery && (
-            <Link href="/whiteboard/new">
+            <Link href={`/whiteboard/new?class=${classId}`}>
               <Button>Create Lesson</Button>
             </Link>
           )}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { Lesson } from '@/types';
 import Card from '@/components/ui/Card';
@@ -9,6 +10,9 @@ import { BookOpen, Calendar, Search } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function StudentLessonsPage() {
+  const searchParams = useSearchParams();
+  const classId = searchParams.get('class');
+  
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [filteredLessons, setFilteredLessons] = useState<Lesson[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -16,7 +20,7 @@ export default function StudentLessonsPage() {
 
   useEffect(() => {
     loadLessons();
-  }, []);
+  }, [classId]);
 
   useEffect(() => {
     const filtered = lessons.filter(lesson =>
@@ -26,11 +30,14 @@ export default function StudentLessonsPage() {
   }, [searchQuery, lessons]);
 
   async function loadLessons() {
+    if (!classId) return;
+    
     const supabase = createClient();
 
     const { data, error } = await supabase
       .from('lessons')
       .select('*')
+      .eq('class_id', classId)
       .order('lesson_date', { ascending: false });
 
     if (!error && data) {
@@ -79,7 +86,7 @@ export default function StudentLessonsPage() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredLessons.map((lesson) => (
-            <Link key={lesson.id} href={`/student/lessons/${lesson.id}`}>
+            <Link key={lesson.id} href={`/student/lessons/${lesson.id}?class=${classId}`}>
               <Card className="p-6 hover:shadow-md transition-shadow cursor-pointer h-full">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                   <BookOpen className="w-6 h-6 text-blue-600" />

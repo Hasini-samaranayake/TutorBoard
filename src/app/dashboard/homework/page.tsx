@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { Homework, Lesson, HomeworkSubmission, User } from '@/types';
 import Card from '@/components/ui/Card';
@@ -16,6 +17,9 @@ interface HomeworkWithLesson extends Homework {
 }
 
 export default function HomeworkPage() {
+  const searchParams = useSearchParams();
+  const classId = searchParams.get('class');
+  
   const [homework, setHomework] = useState<HomeworkWithLesson[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,9 +34,11 @@ export default function HomeworkPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [classId]);
 
   async function loadData() {
+    if (!classId) return;
+    
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -41,8 +47,8 @@ export default function HomeworkPage() {
       { data: lessonsData },
       { data: homeworkData },
     ] = await Promise.all([
-      supabase.from('lessons').select('*').eq('teacher_id', user.id).order('lesson_date', { ascending: false }),
-      supabase.from('homework').select('*, lesson:lessons!inner(*)').eq('lesson.teacher_id', user.id).order('due_date', { ascending: false }),
+      supabase.from('lessons').select('*').eq('teacher_id', user.id).eq('class_id', classId).order('lesson_date', { ascending: false }),
+      supabase.from('homework').select('*, lesson:lessons!inner(*)').eq('lesson.teacher_id', user.id).eq('lesson.class_id', classId).order('due_date', { ascending: false }),
     ]);
 
     setLessons(lessonsData || []);

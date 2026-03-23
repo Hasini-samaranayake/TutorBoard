@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { Homework, Lesson, HomeworkSubmission } from '@/types';
 import Card from '@/components/ui/Card';
@@ -15,6 +16,9 @@ interface HomeworkWithStatus extends Homework {
 }
 
 export default function StudentHomeworkPage() {
+  const searchParams = useSearchParams();
+  const classId = searchParams.get('class');
+  
   const [homework, setHomework] = useState<HomeworkWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -25,9 +29,11 @@ export default function StudentHomeworkPage() {
 
   useEffect(() => {
     loadHomework();
-  }, []);
+  }, [classId]);
 
   async function loadHomework() {
+    if (!classId) return;
+    
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -36,7 +42,7 @@ export default function StudentHomeworkPage() {
       { data: homeworkData },
       { data: submissions },
     ] = await Promise.all([
-      supabase.from('homework').select('*, lesson:lessons(*)').order('due_date', { ascending: true }),
+      supabase.from('homework').select('*, lesson:lessons!inner(*)').eq('lesson.class_id', classId).order('due_date', { ascending: true }),
       supabase.from('homework_submissions').select('*').eq('student_id', user.id),
     ]);
 

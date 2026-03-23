@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { User, Lesson, Homework, HomeworkSubmission } from '@/types';
 import Card from '@/components/ui/Card';
+import { useClass } from '@/contexts/ClassContext';
 import { BookOpen, FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { format, isPast, isToday, differenceInDays } from 'date-fns';
 
@@ -21,6 +23,10 @@ interface DashboardData {
 }
 
 export default function StudentDashboard() {
+  const searchParams = useSearchParams();
+  const classId = searchParams.get('class');
+  const { currentClass } = useClass();
+  
   const [data, setData] = useState<DashboardData>({
     profile: null,
     recentLessons: [],
@@ -32,6 +38,8 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     async function loadDashboard() {
+      if (!classId) return;
+      
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -43,8 +51,8 @@ export default function StudentDashboard() {
         { data: submissions },
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase.from('lessons').select('*').order('lesson_date', { ascending: false }).limit(5),
-        supabase.from('homework').select('*, lesson:lessons(*)').order('due_date', { ascending: true }),
+        supabase.from('lessons').select('*').eq('class_id', classId).order('lesson_date', { ascending: false }).limit(5),
+        supabase.from('homework').select('*, lesson:lessons!inner(*)').eq('lesson.class_id', classId).order('due_date', { ascending: true }),
         supabase.from('homework_submissions').select('*').eq('student_id', user.id),
       ]);
 
@@ -68,7 +76,7 @@ export default function StudentDashboard() {
     }
 
     loadDashboard();
-  }, []);
+  }, [classId]);
 
   if (isLoading) {
     return (
@@ -88,7 +96,9 @@ export default function StudentDashboard() {
         <h1 className="text-2xl font-bold text-gray-900">
           Welcome back, {data.profile?.name}!
         </h1>
-        <p className="text-gray-600">Here&apos;s your learning overview</p>
+        <p className="text-gray-600">
+          {currentClass ? `${currentClass.name} - Learning Overview` : 'Here\'s your learning overview'}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -140,7 +150,7 @@ export default function StudentDashboard() {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Upcoming Homework</h2>
-            <Link href="/student/homework" className="text-sm text-blue-600 hover:underline">
+            <Link href={`/student/homework?class=${classId}`} className="text-sm text-blue-600 hover:underline">
               View all
             </Link>
           </div>
@@ -158,7 +168,7 @@ export default function StudentDashboard() {
                 return (
                   <Link
                     key={hw.id}
-                    href="/student/homework"
+                    href={`/student/homework?class=${classId}`}
                     className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
@@ -196,7 +206,7 @@ export default function StudentDashboard() {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Recent Lessons</h2>
-            <Link href="/student/lessons" className="text-sm text-blue-600 hover:underline">
+            <Link href={`/student/lessons?class=${classId}`} className="text-sm text-blue-600 hover:underline">
               View all
             </Link>
           </div>
@@ -210,7 +220,7 @@ export default function StudentDashboard() {
               {data.recentLessons.map((lesson) => (
                 <Link
                   key={lesson.id}
-                  href={`/student/lessons/${lesson.id}`}
+                  href={`/student/lessons/${lesson.id}?class=${classId}`}
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center gap-3">

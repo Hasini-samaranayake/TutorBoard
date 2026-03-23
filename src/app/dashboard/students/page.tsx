@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { User, HomeworkSubmission, Homework } from '@/types';
 import Card from '@/components/ui/Card';
@@ -15,6 +16,9 @@ interface StudentWithStats extends User {
 }
 
 export default function StudentsPage() {
+  const searchParams = useSearchParams();
+  const classId = searchParams.get('class');
+  
   const [students, setStudents] = useState<StudentWithStats[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<StudentWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,7 +28,7 @@ export default function StudentsPage() {
 
   useEffect(() => {
     loadStudents();
-  }, []);
+  }, [classId]);
 
   useEffect(() => {
     const filtered = students.filter(student =>
@@ -35,18 +39,34 @@ export default function StudentsPage() {
   }, [searchQuery, students]);
 
   async function loadStudents() {
+    if (!classId) return;
+    
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+
+    const { data: enrollments } = await supabase
+      .from('class_enrollments')
+      .select('student_id')
+      .eq('class_id', classId);
+
+    if (!enrollments || enrollments.length === 0) {
+      setStudents([]);
+      setFilteredStudents([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const studentIds = enrollments.map(e => e.student_id);
 
     const [
       { data: studentProfiles },
       { data: homework },
       { data: submissions },
     ] = await Promise.all([
-      supabase.from('profiles').select('*').eq('role', 'student'),
-      supabase.from('homework').select('*, lesson:lessons!inner(teacher_id)').eq('lesson.teacher_id', user.id),
-      supabase.from('homework_submissions').select('*'),
+      supabase.from('profiles').select('*').in('id', studentIds),
+      supabase.from('homework').select('*, lesson:lessons!inner(teacher_id, class_id)').eq('lesson.teacher_id', user.id).eq('lesson.class_id', classId),
+      supabase.from('homework_submissions').select('*').in('student_id', studentIds),
     ]);
 
     const totalHomework = homework?.length || 0;

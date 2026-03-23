@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { Lesson } from '@/types';
 import Whiteboard from '@/components/whiteboard/Whiteboard';
@@ -12,6 +12,9 @@ import Link from 'next/link';
 export default function WhiteboardPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const classId = searchParams.get('class');
+  
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -62,6 +65,7 @@ export default function WhiteboardPage() {
           .from('lessons')
           .insert({
             teacher_id: user.id,
+            class_id: classId,
             title: `Lesson - ${new Date().toLocaleDateString()}`,
             lesson_date: new Date().toISOString().split('T')[0],
             canvas_data: canvasData,
@@ -72,7 +76,7 @@ export default function WhiteboardPage() {
 
         if (error) throw error;
         
-        router.replace(`/whiteboard/${data.id}`);
+        router.replace(`/whiteboard/${data.id}${classId ? `?class=${classId}` : ''}`);
         setLesson(data);
       } else {
         const { error } = await supabase
@@ -105,7 +109,7 @@ export default function WhiteboardPage() {
       <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link
-            href="/dashboard"
+            href={classId ? `/dashboard?class=${classId}` : '/classes'}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="w-5 h-5" />

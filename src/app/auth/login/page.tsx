@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { signIn } from '@/lib/auth';
-import { createClient } from '@/lib/supabase';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Card from '@/components/ui/Card';
@@ -29,22 +28,7 @@ export default function LoginPage() {
         throw new Error('Login failed - no user returned');
       }
 
-      const supabase = createClient();
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .single();
-
-      console.log('User ID:', data.user.id);
-      console.log('Profile:', profile);
-      console.log('Profile Error:', profileError);
-
-      if (profile?.role === 'teacher') {
-        router.push('/dashboard');
-      } else {
-        router.push('/student');
-      }
+      router.push('/classes');
     } catch (err) {
       console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'Failed to sign in');

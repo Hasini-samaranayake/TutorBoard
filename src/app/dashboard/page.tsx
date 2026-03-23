@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { Lesson, User, HomeworkSubmission } from '@/types';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import { useClass } from '@/contexts/ClassContext';
 import { 
   Plus, 
   BookOpen, 
@@ -26,6 +28,10 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
+  const classId = searchParams.get('class');
+  const { currentClass } = useClass();
+  
   const [stats, setStats] = useState<DashboardStats>({
     totalStudents: 0,
     totalLessons: 0,
@@ -38,6 +44,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function loadDashboard() {
+      if (!classId) return;
+      
       const supabase = createClient();
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -50,11 +58,11 @@ export default function DashboardPage() {
         { data: homework },
         { data: submissions },
       ] = await Promise.all([
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student'),
-        supabase.from('lessons').select('*', { count: 'exact', head: true }).eq('teacher_id', user.id),
-        supabase.from('lessons').select('*').eq('teacher_id', user.id).order('created_at', { ascending: false }).limit(5),
-        supabase.from('homework').select('*, lesson:lessons!inner(teacher_id)').eq('lesson.teacher_id', user.id),
-        supabase.from('homework_submissions').select('*, student:profiles(*), homework:homework(*)').order('submitted_at', { ascending: false }).limit(5),
+        supabase.from('class_enrollments').select('*', { count: 'exact', head: true }).eq('class_id', classId),
+        supabase.from('lessons').select('*', { count: 'exact', head: true }).eq('teacher_id', user.id).eq('class_id', classId),
+        supabase.from('lessons').select('*').eq('teacher_id', user.id).eq('class_id', classId).order('created_at', { ascending: false }).limit(5),
+        supabase.from('homework').select('*, lesson:lessons!inner(teacher_id, class_id)').eq('lesson.teacher_id', user.id).eq('lesson.class_id', classId),
+        supabase.from('homework_submissions').select('*, student:profiles(*), homework:homework(*, lesson:lessons!inner(class_id))').eq('homework.lesson.class_id', classId).order('submitted_at', { ascending: false }).limit(5),
       ]);
 
       const totalHomework = (homework?.length || 0) * (studentCount || 0);
@@ -74,7 +82,7 @@ export default function DashboardPage() {
     }
 
     loadDashboard();
-  }, []);
+  }, [classId]);
 
   if (isLoading) {
     return (
@@ -89,9 +97,11 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600">Welcome back! Here&apos;s an overview of your tutoring activity.</p>
+          <p className="text-gray-600">
+            {currentClass ? `${currentClass.name} - Overview` : 'Welcome back! Here\'s an overview of your tutoring activity.'}
+          </p>
         </div>
-        <Link href="/whiteboard/new">
+        <Link href={`/whiteboard/new?class=${classId}`}>
           <Button>
             <Plus className="w-5 h-5 mr-2" />
             New Lesson
@@ -130,7 +140,7 @@ export default function DashboardPage() {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Recent Lessons</h2>
-            <Link href="/dashboard/lessons" className="text-sm text-blue-600 hover:underline">
+            <Link href={`/dashboard/lessons?class=${classId}`} className="text-sm text-blue-600 hover:underline">
               View all
             </Link>
           </div>
@@ -168,7 +178,7 @@ export default function DashboardPage() {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Recent Submissions</h2>
-            <Link href="/dashboard/homework" className="text-sm text-blue-600 hover:underline">
+            <Link href={`/dashboard/homework?class=${classId}`} className="text-sm text-blue-600 hover:underline">
               View all
             </Link>
           </div>

@@ -11,11 +11,27 @@ export interface User {
 export interface Lesson {
   id: string;
   teacher_id: string;
+  class_id: string | null;
   title: string;
   lesson_date: string;
   canvas_data: string | null;
   template: string;
   created_at: string;
+}
+
+export interface Class {
+  id: string;
+  teacher_id: string;
+  name: string;
+  join_code: string;
+  created_at: string;
+}
+
+export interface ClassEnrollment {
+  id: string;
+  class_id: string;
+  student_id: string;
+  joined_at: string;
 }
 
 export interface Homework {
