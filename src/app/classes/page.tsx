@@ -57,20 +57,26 @@ export default function ClassesPage() {
   async function loadData() {
     const supabase = createClient();
     
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error('Auth error:', authError);
       router.push('/auth/login');
       return;
     }
 
-    const { data: profileData } = await supabase
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('id, role, name')
       .eq('id', user.id)
       .single();
 
+    if (profileError) {
+      console.error('Profile error:', profileError);
+    }
+
     if (!profileData) {
-      router.push('/auth/login');
+      console.error('No profile found for user:', user.id);
+      setIsLoading(false);
       return;
     }
 
@@ -202,6 +208,22 @@ export default function ClassesPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Card className="p-8 text-center max-w-md">
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Profile Not Found</h2>
+          <p className="text-gray-600 mb-4">
+            Your profile could not be loaded. This might happen if your account was just created.
+          </p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </Card>
       </div>
     );
   }

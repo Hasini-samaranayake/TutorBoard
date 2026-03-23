@@ -43,14 +43,16 @@ export async function middleware(request: NextRequest) {
   const publicPaths = ['/', '/auth/login', '/auth/register', '/auth/callback', '/auth/forgot-password'];
   const isPublicPath = publicPaths.some(path => request.nextUrl.pathname === path);
   const pathname = request.nextUrl.pathname;
+  
+  const isApiRoute = pathname.startsWith('/api/');
 
-  if (!user && !isPublicPath) {
+  if (!user && !isPublicPath && !isApiRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
     return NextResponse.redirect(url);
   }
 
-  if (user) {
+  if (user && !isApiRoute) {
     const isDashboardOrStudent = pathname.startsWith('/dashboard') || pathname.startsWith('/student');
     const hasClassParam = request.nextUrl.searchParams.has('class');
     
