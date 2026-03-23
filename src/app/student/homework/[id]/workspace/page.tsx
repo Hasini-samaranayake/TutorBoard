@@ -23,16 +23,37 @@ export default function StudentHomeworkWorkspacePage() {
   const [resources, setResources] = useState<HomeworkResource[]>([]);
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [selectedResourceUrl, setSelectedResourceUrl] = useState<string | null>(null);
+  const [resourceLoadError, setResourceLoadError] = useState<string | null>(null);
   const [submission, setSubmission] = useState<HomeworkSubmission | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isSubmittingFinal, setIsSubmittingFinal] = useState(false);
   const [annotationData, setAnnotationData] = useState<string | null>(null);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [lastDraftSavedAt, setLastDraftSavedAt] = useState<string | null>(null);
   const [pdfPage, setPdfPage] = useState(1);
 
   const selectedResource = useMemo(
     () => resources.find((r) => r.id === selectedResourceId) || null,
     [resources, selectedResourceId]
   );
+
+  function parseAnnotationPayload(raw: string | null | undefined): { whiteboardData: string; submitted: boolean; savedAt: string | null } {
+    if (!raw) return { whiteboardData: '', submitted: false, savedAt: null };
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && typeof parsed.whiteboardData === 'string') {
+        return {
+          whiteboardData: parsed.whiteboardData,
+          submitted: !!parsed.submitted,
+          savedAt: typeof parsed.savedAt === 'string' ? parsed.savedAt : null,
+        };
+      }
+      return { whiteboardData: raw, submitted: false, savedAt: null };
+    } catch {
+      return { whiteboardData: raw, submitted: false, savedAt: null };
+    }
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -65,9 +86,10 @@ export default function StudentHomeworkWorkspacePage() {
           .single();
         if (existingSubmission) {
           setSubmission(existingSubmission as HomeworkSubmission);
-          if (existingSubmission.annotation_data) {
-            setAnnotationData(existingSubmission.annotation_data);
-          }
+          const parsed = parseAnnotationPayload(existingSubmission.annotation_data);
+          if (parsed.whiteboardData) setAnnotationData(parsed.whiteboardData);
+          setIsSubmitted(parsed.submitted || existingSubmission.submission_type === 'file_upload');
+          setLastDraftSavedAt(parsed.savedAt);
           if (existingSubmission.source_resource_id) {
             setSelectedResourceId(existingSubmission.source_resource_id);
           }
@@ -83,8 +105,13 @@ export default function StudentHomeworkWorkspacePage() {
   useEffect(() => {
     async function loadSignedUrl() {
       if (!selectedResourceId) return;
+      setResourceLoadError(null);
       const response = await fetch(`/api/homework/resources/${selectedResourceId}/view`);
-      if (!response.ok) return;
+      if (!response.ok) {
+        setSelectedResourceUrl(null);
+        setResourceLoadError('Unable to load assigned resource.');
+        return;
+      }
       const data = await response.json() as { signedUrl: string };
       setSelectedResourceUrl(data.signedUrl);
       setPdfPage(1);
@@ -92,16 +119,30 @@ export default function StudentHomeworkWorkspacePage() {
     loadSignedUrl();
   }, [selectedResourceId]);
 
-  const submitAnnotatedResource = async () => {
+  const saveAnnotated = async (finalSubmit: boolean) => {
     if (!homework || !selectedResource || !annotationData) return;
-    setIsSaving(true);
+    if (finalSubmit) {
+      setIsSubmittingFinal(true);
+    } else {
+      setIsSavingDraft(true);
+    }
+
+    const savedAt = new Date().toISOString();
+    const annotationPayload = JSON.stringify({
+      whiteboardData: annotationData,
+      submitted: finalSubmit,
+      savedAt,
+      selectedResourceId: selectedResource.id,
+      pdfPage,
+    });
+
     const response = await fetch('/api/homework/submissions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         homeworkId: homework.id,
         submissionType: 'annotated_resource',
-        annotationData,
+        annotationData: annotationPayload,
         sourceResourceId: selectedResource.id,
       }),
     });
@@ -109,11 +150,17 @@ export default function StudentHomeworkWorkspacePage() {
     if (response.ok) {
       const saved = await response.json() as HomeworkSubmission;
       setSubmission(saved);
-      alert('Annotated submission saved successfully.');
+      setIsSubmitted(finalSubmit);
+      setLastDraftSavedAt(savedAt);
+      alert(finalSubmit ? 'Homework submitted successfully.' : 'Draft saved. You can continue later.');
     } else {
-      alert('Failed to save annotation submission.');
+      alert(finalSubmit ? 'Failed to submit homework.' : 'Failed to save draft.');
     }
-    setIsSaving(false);
+    if (finalSubmit) {
+      setIsSubmittingFinal(false);
+    } else {
+      setIsSavingDraft(false);
+    }
   };
 
   if (isLoading) {
@@ -135,9 +182,19 @@ export default function StudentHomeworkWorkspacePage() {
           <span className="text-gray-300">|</span>
           <h1 className="font-semibold text-gray-900">Homework Resource Workspace</h1>
         </div>
-        <Button onClick={submitAnnotatedResource} isLoading={isSaving}>
-          Submit Annotated Resource
-        </Button>
+        <div className="flex items-center gap-2">
+          {lastDraftSavedAt && (
+            <span className="text-sm text-gray-500">
+              Draft saved: {new Date(lastDraftSavedAt).toLocaleTimeString()}
+            </span>
+          )}
+          <Button variant="secondary" onClick={() => saveAnnotated(false)} isLoading={isSavingDraft}>
+            Save Draft
+          </Button>
+          <Button onClick={() => saveAnnotated(true)} isLoading={isSubmittingFinal} disabled={isSubmitted}>
+            {isSubmitted ? 'Submitted' : 'Submit Final'}
+          </Button>
+        </div>
       </header>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 min-h-0">
@@ -176,8 +233,11 @@ export default function StudentHomeworkWorkspacePage() {
           )}
 
           <div className="flex-1 border rounded-lg overflow-hidden bg-gray-100">
-            {!selectedResourceUrl && (
+            {!selectedResourceUrl && !resourceLoadError && (
               <div className="p-6 text-center text-gray-500">No resource selected</div>
+            )}
+            {resourceLoadError && (
+              <div className="p-6 text-center text-red-600">{resourceLoadError}</div>
             )}
             {selectedResourceUrl && selectedResource?.mime_type.includes('image') && (
               <img src={selectedResourceUrl} alt={selectedResource.name} className="w-full h-full object-contain" />
@@ -190,9 +250,6 @@ export default function StudentHomeworkWorkspacePage() {
               />
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Download is intentionally disabled. Resource is view-only.
-          </p>
         </Card>
 
         <Card className="p-0 min-h-0 overflow-hidden">

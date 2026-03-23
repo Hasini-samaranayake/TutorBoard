@@ -18,7 +18,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     // RLS on homework_resources already validates access for this user.
     const { data: signed, error: signedError } = await supabase.storage
       .from('homework-resources')
-      .createSignedUrl(resource.storage_path, 60);
+      .createSignedUrl(resource.storage_path, 3600);
     if (signedError || !signed?.signedUrl) throw signedError || new Error('Failed to sign URL');
 
     return NextResponse.json({

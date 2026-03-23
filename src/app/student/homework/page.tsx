@@ -17,6 +17,19 @@ interface HomeworkWithStatus extends Homework {
   resources?: HomeworkResource[];
 }
 
+function parseAnnotationSubmission(raw: string | null | undefined): { submitted: boolean } {
+  if (!raw) return { submitted: false };
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && typeof parsed.submitted === 'boolean') {
+      return { submitted: parsed.submitted };
+    }
+  } catch {
+    // ignore legacy/plain data
+  }
+  return { submitted: false };
+}
+
 export default function StudentHomeworkPage() {
   const searchParams = useSearchParams();
   const classId = searchParams.get('class');
@@ -29,6 +42,13 @@ export default function StudentHomeworkPage() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [submissionLinks, setSubmissionLinks] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isSubmissionFinal = (sub?: HomeworkSubmission) => {
+    if (!sub) return false;
+    if (sub.submission_type === 'file_upload') return true;
+    const parsed = parseAnnotationSubmission(sub.annotation_data);
+    return parsed.submitted;
+  };
 
   useEffect(() => {
     loadHomework();
@@ -142,13 +162,13 @@ export default function StudentHomeworkPage() {
   };
 
   const filteredHomework = homework.filter(hw => {
-    if (filter === 'pending') return !hw.submission;
-    if (filter === 'completed') return !!hw.submission;
+    if (filter === 'pending') return !isSubmissionFinal(hw.submission);
+    if (filter === 'completed') return isSubmissionFinal(hw.submission);
     return true;
   });
 
   const getStatusInfo = (hw: HomeworkWithStatus) => {
-    if (hw.submission) {
+    if (isSubmissionFinal(hw.submission)) {
       return {
         icon: <CheckCircle className="w-5 h-5 text-green-600" />,
         badge: <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">Completed</span>,
@@ -211,7 +231,7 @@ export default function StudentHomeworkPage() {
             filter === 'pending' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
         >
-          Pending ({homework.filter(h => !h.submission).length})
+          Pending ({homework.filter(h => !isSubmissionFinal(h.submission)).length})
         </button>
         <button
           onClick={() => setFilter('completed')}
@@ -219,7 +239,7 @@ export default function StudentHomeworkPage() {
             filter === 'completed' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
         >
-          Completed ({homework.filter(h => h.submission).length})
+          Completed ({homework.filter(h => isSubmissionFinal(h.submission)).length})
         </button>
       </div>
 
@@ -266,7 +286,7 @@ export default function StudentHomeworkPage() {
                             {hw.resources?.length} resource{hw.resources?.length === 1 ? '' : 's'}
                           </span>
                         )}
-                        {hw.submission && (
+                        {isSubmissionFinal(hw.submission) && hw.submission && (
                           <span className="flex items-center gap-1 text-green-600">
                             <CheckCircle className="w-4 h-4" />
                             Submitted {format(new Date(hw.submission.submitted_at), 'MMM d')}
@@ -276,7 +296,7 @@ export default function StudentHomeworkPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {hw.submission ? (
+                    {isSubmissionFinal(hw.submission) ? (
                       <button
                         type="button"
                         onClick={() => handleViewSubmission(hw.submission!.id)}
@@ -291,7 +311,7 @@ export default function StudentHomeworkPage() {
                           <Link href={`/student/homework/${hw.id}/workspace?class=${classId}`}>
                             <Button variant="secondary">
                               <PenLine className="w-4 h-4 mr-2" />
-                              Annotate Resource
+                              {hw.submission?.submission_type === 'annotated_resource' ? 'Continue Annotation' : 'Annotate Resource'}
                             </Button>
                           </Link>
                         )}
