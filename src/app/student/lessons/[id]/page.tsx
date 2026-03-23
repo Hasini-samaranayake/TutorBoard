@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import * as fabric from 'fabric';
 import { createClient } from '@/lib/supabase';
@@ -56,6 +56,8 @@ function parseAnnotationData(data: string | null, defaultPageId: string): Record
 export default function StudentLessonViewPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const classIdFromQuery = searchParams.get('class');
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [annotation, setAnnotation] = useState<Annotation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -316,6 +318,10 @@ export default function StudentLessonViewPage() {
     setCurrentPageIndex((prev) => Math.min(prev + 1, pages.length - 1));
   };
 
+  const lessonsBackUrl = classIdFromQuery || lesson?.class_id
+    ? `/student/lessons?class=${classIdFromQuery || lesson?.class_id}`
+    : '/student/lessons';
+
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -328,7 +334,7 @@ export default function StudentLessonViewPage() {
     return (
       <div className="p-8 text-center">
         <p>Lesson not found</p>
-        <Link href="/student/lessons">
+        <Link href={lessonsBackUrl}>
           <Button className="mt-4">Back to Lessons</Button>
         </Link>
       </div>
@@ -340,7 +346,7 @@ export default function StudentLessonViewPage() {
       <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link
-            href="/student/lessons"
+            href={lessonsBackUrl}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="w-5 h-5" />
