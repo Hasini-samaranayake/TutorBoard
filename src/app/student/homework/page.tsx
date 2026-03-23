@@ -1,18 +1,20 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
-import { Homework, Lesson, HomeworkSubmission } from '@/types';
+import { Homework, Lesson, HomeworkSubmission, HomeworkResource } from '@/types';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import { FileText, Calendar, CheckCircle, Clock, Upload, AlertCircle, ExternalLink } from 'lucide-react';
+import { FileText, Calendar, CheckCircle, Clock, Upload, AlertCircle, ExternalLink, PenLine, Link as LinkIcon } from 'lucide-react';
 import { format, isPast, isToday, differenceInDays } from 'date-fns';
 
 interface HomeworkWithStatus extends Homework {
   lesson: Lesson;
   submission?: HomeworkSubmission;
+  resources?: HomeworkResource[];
 }
 
 export default function StudentHomeworkPage() {
@@ -25,6 +27,7 @@ export default function StudentHomeworkPage() {
   const [selectedHomework, setSelectedHomework] = useState<HomeworkWithStatus | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [submissionLinks, setSubmissionLinks] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -41,16 +44,23 @@ export default function StudentHomeworkPage() {
     const [
       { data: homeworkData },
       { data: submissions },
+      { data: resources },
     ] = await Promise.all([
       supabase.from('homework').select('*, lesson:lessons!inner(*)').eq('lesson.class_id', classId).order('due_date', { ascending: true }),
       supabase.from('homework_submissions').select('*').eq('student_id', user.id),
+      supabase.from('homework_resources').select('*'),
     ]);
 
     const submissionMap = new Map(submissions?.map(s => [s.homework_id, s]) || []);
+    const resourceMap = new Map<string, HomeworkResource[]>();
+    (resources || []).forEach((r) => {
+      resourceMap.set(r.homework_id, [...(resourceMap.get(r.homework_id) || []), r]);
+    });
 
     const homeworkWithStatus: HomeworkWithStatus[] = (homeworkData || []).map(hw => ({
       ...hw,
       submission: submissionMap.get(hw.id),
+      resources: resourceMap.get(hw.id) || [],
     }));
 
     setHomework(homeworkWithStatus);
@@ -87,11 +97,16 @@ export default function StudentHomeworkPage() {
 
       const { data: submission, error: insertError } = await supabase
         .from('homework_submissions')
-        .insert({
+        .upsert({
           homework_id: selectedHomework.id,
           student_id: user.id,
           file_url: publicUrl,
-        })
+          storage_path: fileName,
+          submission_type: 'file_upload',
+          annotation_data: null,
+          source_resource_id: null,
+          submitted_at: new Date().toISOString(),
+        }, { onConflict: 'homework_id,student_id' })
         .select()
         .single();
 
@@ -113,6 +128,16 @@ export default function StudentHomeworkPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleViewSubmission = async (submissionId: string) => {
+    const response = await fetch(`/api/homework/submissions/${submissionId}/view`);
+    if (!response.ok) return;
+    const data = await response.json() as { signedUrl?: string | null };
+    if (data.signedUrl) {
+      setSubmissionLinks((prev) => ({ ...prev, [submissionId]: data.signedUrl || '' }));
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -235,6 +260,12 @@ export default function StudentHomeworkPage() {
                           <Calendar className="w-4 h-4" />
                           Due: {format(new Date(hw.due_date), 'MMM d, yyyy')}
                         </span>
+                        {(hw.resources?.length || 0) > 0 && (
+                          <span className="flex items-center gap-1">
+                            <LinkIcon className="w-4 h-4" />
+                            {hw.resources?.length} resource{hw.resources?.length === 1 ? '' : 's'}
+                          </span>
+                        )}
                         {hw.submission && (
                           <span className="flex items-center gap-1 text-green-600">
                             <CheckCircle className="w-4 h-4" />
@@ -246,20 +277,29 @@ export default function StudentHomeworkPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {hw.submission ? (
-                      <a
-                        href={hw.submission.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => handleViewSubmission(hw.submission!.id)}
                         className="flex items-center gap-1 text-blue-600 hover:underline"
                       >
                         <ExternalLink className="w-4 h-4" />
                         View Submission
-                      </a>
+                      </button>
                     ) : (
-                      <Button onClick={() => handleOpenSubmit(hw)}>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Submit
-                      </Button>
+                      <>
+                        {(hw.resources?.length || 0) > 0 && (
+                          <Link href={`/student/homework/${hw.id}/workspace?class=${classId}`}>
+                            <Button variant="secondary">
+                              <PenLine className="w-4 h-4 mr-2" />
+                              Annotate Resource
+                            </Button>
+                          </Link>
+                        )}
+                        <Button onClick={() => handleOpenSubmit(hw)}>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload File
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -281,6 +321,14 @@ export default function StudentHomeworkPage() {
               <p className="text-sm text-gray-500">
                 Due: {format(new Date(selectedHomework.due_date), 'MMMM d, yyyy')}
               </p>
+              {(selectedHomework.resources?.length || 0) > 0 && (
+                <Link href={`/student/homework/${selectedHomework.id}/workspace?class=${classId}`} className="inline-flex mt-3">
+                  <Button variant="secondary" size="sm">
+                    <PenLine className="w-4 h-4 mr-2" />
+                    Open Resource Workspace
+                  </Button>
+                </Link>
+              )}
             </div>
 
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">

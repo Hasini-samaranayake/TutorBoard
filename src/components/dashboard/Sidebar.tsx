@@ -7,7 +7,6 @@ import {
   BookOpen, 
   Users, 
   FileText, 
-  FolderOpen,
   LogOut,
   Settings,
   ArrowLeftRight,
@@ -23,7 +22,6 @@ const navItems = [
   { href: '/dashboard/lessons', icon: BookOpen, label: 'Lessons' },
   { href: '/dashboard/students', icon: Users, label: 'Students' },
   { href: '/dashboard/homework', icon: FileText, label: 'Homework' },
-  { href: '/dashboard/resources', icon: FolderOpen, label: 'Resources' },
 ];
 
 export default function Sidebar() {

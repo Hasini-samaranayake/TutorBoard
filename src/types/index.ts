@@ -41,16 +41,32 @@ export interface Homework {
   due_date: string;
   created_at: string;
   lesson?: Lesson;
+  resources?: HomeworkResource[];
 }
 
 export interface HomeworkSubmission {
   id: string;
   homework_id: string;
   student_id: string;
-  file_url: string;
+  file_url: string | null;
+  storage_path?: string | null;
+  submission_type?: 'file_upload' | 'annotated_resource';
+  annotation_data?: string | null;
+  source_resource_id?: string | null;
   submitted_at: string;
   student?: User;
   homework?: Homework;
+}
+
+export interface HomeworkResource {
+  id: string;
+  homework_id: string;
+  teacher_id: string;
+  name: string;
+  mime_type: string;
+  storage_path: string;
+  page_count: number;
+  created_at: string;
 }
 
 export interface Annotation {

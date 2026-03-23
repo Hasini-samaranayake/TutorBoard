@@ -1,18 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
-import { Homework, Lesson, HomeworkSubmission, User } from '@/types';
+import { Homework, Lesson, HomeworkSubmission, User, HomeworkResource } from '@/types';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
-import { Plus, FileText, Calendar, Users, CheckCircle, Clock, Trash2, Eye } from 'lucide-react';
+import { Plus, FileText, Calendar, Users, CheckCircle, Trash2, Eye, Upload, Image as ImageIcon, FileBadge2, Link as LinkIcon } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 
 interface HomeworkWithLesson extends Homework {
   lesson: Lesson;
+  resources?: HomeworkResource[];
   submissions?: (HomeworkSubmission & { student: User })[];
 }
 
@@ -26,6 +27,11 @@ export default function HomeworkPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedHomework, setSelectedHomework] = useState<HomeworkWithLesson | null>(null);
+  const [submissionLinks, setSubmissionLinks] = useState<Record<string, string>>({});
+  const [isCreating, setIsCreating] = useState(false);
+  const [resourceFiles, setResourceFiles] = useState<File[]>([]);
+  const [resourcePageCounts, setResourcePageCounts] = useState<Record<string, number>>({});
+  const resourceInputRef = useRef<HTMLInputElement>(null);
   const [newHomework, setNewHomework] = useState({
     lesson_id: '',
     description: '',
@@ -46,19 +52,31 @@ export default function HomeworkPage() {
     const [
       { data: lessonsData },
       { data: homeworkData },
+      { data: resourcesData },
     ] = await Promise.all([
       supabase.from('lessons').select('*').eq('teacher_id', user.id).eq('class_id', classId).order('lesson_date', { ascending: false }),
       supabase.from('homework').select('*, lesson:lessons!inner(*)').eq('lesson.teacher_id', user.id).eq('lesson.class_id', classId).order('due_date', { ascending: false }),
+      supabase.from('homework_resources').select('*').eq('teacher_id', user.id).order('created_at', { ascending: false }),
     ]);
 
     setLessons(lessonsData || []);
-    setHomework(homeworkData as HomeworkWithLesson[] || []);
+    const resourceMap = new Map<string, HomeworkResource[]>();
+    (resourcesData || []).forEach((r) => {
+      const key = r.homework_id;
+      resourceMap.set(key, [...(resourceMap.get(key) || []), r]);
+    });
+    const merged = (homeworkData as HomeworkWithLesson[] || []).map((h) => ({
+      ...h,
+      resources: resourceMap.get(h.id) || [],
+    }));
+    setHomework(merged);
     setIsLoading(false);
   }
 
   const handleCreateHomework = async () => {
     if (!newHomework.lesson_id || !newHomework.description || !newHomework.due_date) return;
 
+    setIsCreating(true);
     const supabase = createClient();
     const { data, error } = await supabase
       .from('homework')
@@ -67,10 +85,30 @@ export default function HomeworkPage() {
       .single();
 
     if (!error && data) {
-      setHomework([data as HomeworkWithLesson, ...homework]);
+      const created = data as HomeworkWithLesson;
+      const uploadedResources: HomeworkResource[] = [];
+      for (const file of resourceFiles) {
+        const formData = new FormData();
+        formData.append('homeworkId', created.id);
+        formData.append('file', file);
+        formData.append('pageCount', String(resourcePageCounts[file.name] || 1));
+        const response = await fetch('/api/homework/resources', {
+          method: 'POST',
+          body: formData,
+        });
+        if (response.ok) {
+          const resource = await response.json() as HomeworkResource;
+          uploadedResources.push(resource);
+        }
+      }
+
+      setHomework([{ ...created, resources: uploadedResources }, ...homework]);
       setIsCreateModalOpen(false);
       setNewHomework({ lesson_id: '', description: '', due_date: '' });
+      setResourceFiles([]);
+      setResourcePageCounts({});
     }
+    setIsCreating(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -86,16 +124,32 @@ export default function HomeworkPage() {
 
   const handleViewSubmissions = async (hw: HomeworkWithLesson) => {
     const supabase = createClient();
-    const { data } = await supabase
+    const [{ data }, resourcesResponse] = await Promise.all([
+      supabase
       .from('homework_submissions')
       .select('*, student:profiles(*)')
-      .eq('homework_id', hw.id);
+      .eq('homework_id', hw.id),
+      fetch(`/api/homework/resources?homeworkId=${hw.id}`),
+    ]);
+
+    const resources = resourcesResponse.ok ? await resourcesResponse.json() as HomeworkResource[] : [];
 
     setSelectedHomework({
       ...hw,
+      resources,
       submissions: data as (HomeworkSubmission & { student: User })[] || [],
     });
     setIsViewModalOpen(true);
+  };
+
+  const handleViewSubmission = async (submissionId: string) => {
+    const response = await fetch(`/api/homework/submissions/${submissionId}/view`);
+    if (!response.ok) return;
+    const data = await response.json() as { signedUrl?: string | null };
+    if (data.signedUrl) {
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+      setSubmissionLinks((prev) => ({ ...prev, [submissionId]: data.signedUrl || '' }));
+    }
   };
 
   const getStatusBadge = (dueDate: string) => {
@@ -159,6 +213,12 @@ export default function HomeworkPage() {
                         <Calendar className="w-4 h-4" />
                         Due: {format(new Date(hw.due_date), 'MMM d, yyyy')}
                       </span>
+                      {(hw.resources?.length || 0) > 0 && (
+                        <span className="flex items-center gap-1">
+                          <LinkIcon className="w-4 h-4" />
+                          {hw.resources?.length} resource{hw.resources?.length === 1 ? '' : 's'}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -189,50 +249,117 @@ export default function HomeworkPage() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         title="Assign Homework"
+        size="xl"
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Select Lesson
-            </label>
-            <select
-              value={newHomework.lesson_id}
-              onChange={(e) => setNewHomework({ ...newHomework, lesson_id: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Choose a lesson...</option>
-              {lessons.map((lesson) => (
-                <option key={lesson.id} value={lesson.id}>
-                  {lesson.title} - {format(new Date(lesson.lesson_date), 'MMM d, yyyy')}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Select Lesson
+              </label>
+              <select
+                value={newHomework.lesson_id}
+                onChange={(e) => setNewHomework({ ...newHomework, lesson_id: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Choose a lesson...</option>
+                {lessons.map((lesson) => (
+                  <option key={lesson.id} value={lesson.id}>
+                    {lesson.title} - {format(new Date(lesson.lesson_date), 'MMM d, yyyy')}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={newHomework.description}
-              onChange={(e) => setNewHomework({ ...newHomework, description: e.target.value })}
-              placeholder="Describe the homework assignment..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-24"
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                value={newHomework.description}
+                onChange={(e) => setNewHomework({ ...newHomework, description: e.target.value })}
+                placeholder="Describe the homework assignment..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-36"
+              />
+            </div>
+
+            <Input
+              label="Due Date"
+              type="date"
+              value={newHomework.due_date}
+              onChange={(e) => setNewHomework({ ...newHomework, due_date: e.target.value })}
             />
           </div>
 
-          <Input
-            label="Due Date"
-            type="date"
-            value={newHomework.due_date}
-            onChange={(e) => setNewHomework({ ...newHomework, due_date: e.target.value })}
-          />
+          <div className="space-y-4">
+            <div className="border rounded-lg p-4 bg-gray-50">
+              <h4 className="font-medium text-gray-900 mb-2">Attach Homework Resources</h4>
+              <p className="text-sm text-gray-500 mb-3">
+                Students can annotate these resources in whiteboard mode or submit a separate file.
+              </p>
+              <input
+                ref={resourceInputRef}
+                type="file"
+                accept="image/*,.pdf"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  setResourceFiles(files);
+                  const defaultPageCounts: Record<string, number> = {};
+                  files.forEach((f) => {
+                    defaultPageCounts[f.name] = f.type === 'application/pdf' ? 1 : 1;
+                  });
+                  setResourcePageCounts(defaultPageCounts);
+                }}
+                className="hidden"
+              />
+              <Button variant="secondary" onClick={() => resourceInputRef.current?.click()}>
+                <Upload className="w-4 h-4 mr-2" />
+                Upload Resources
+              </Button>
+              {resourceFiles.length > 0 && (
+                <div className="mt-4 space-y-2 max-h-64 overflow-auto">
+                  {resourceFiles.map((file) => {
+                    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+                    return (
+                      <div key={file.name} className="border rounded-lg p-3 bg-white">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {isPdf ? <FileBadge2 className="w-4 h-4 text-red-500" /> : <ImageIcon className="w-4 h-4 text-blue-500" />}
+                            <span className="text-sm font-medium text-gray-800">{file.name}</span>
+                          </div>
+                          <span className="text-xs text-gray-500">{Math.round(file.size / 1024)} KB</span>
+                        </div>
+                        {isPdf && (
+                          <div className="mt-2">
+                            <label className="text-xs text-gray-600">PDF pages (for annotation navigation)</label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={resourcePageCounts[file.name] || 1}
+                              onChange={(e) => setResourcePageCounts((prev) => ({
+                                ...prev,
+                                [file.name]: Math.max(1, Number(e.target.value) || 1),
+                              }))}
+                              className="mt-1 w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
 
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="lg:col-span-2 flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setIsCreateModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateHomework}>Assign Homework</Button>
+            <Button onClick={handleCreateHomework} isLoading={isCreating}>
+              Assign Homework
+            </Button>
           </div>
         </div>
       </Modal>
@@ -250,6 +377,16 @@ export default function HomeworkPage() {
               <p className="text-sm text-gray-500">
                 Due: {format(new Date(selectedHomework.due_date), 'MMMM d, yyyy')}
               </p>
+              {(selectedHomework.resources?.length || 0) > 0 && (
+                <div className="mt-3">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Attached Resources</p>
+                  <div className="space-y-1">
+                    {selectedHomework.resources?.map((r) => (
+                      <p key={r.id} className="text-sm text-gray-600">{r.name} ({r.mime_type}, {r.page_count} page{r.page_count === 1 ? '' : 's'})</p>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {selectedHomework.submissions?.length === 0 ? (
@@ -272,14 +409,9 @@ export default function HomeworkPage() {
                         </p>
                       </div>
                     </div>
-                    <a
-                      href={sub.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
+                    <Button variant="secondary" size="sm" onClick={() => handleViewSubmission(sub.id)}>
                       View Submission
-                    </a>
+                    </Button>
                   </div>
                 ))}
               </div>

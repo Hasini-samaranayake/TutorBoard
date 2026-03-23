@@ -57,9 +57,25 @@ CREATE TABLE public.homework_submissions (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   homework_id UUID REFERENCES public.homework(id) ON DELETE CASCADE NOT NULL,
   student_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-  file_url TEXT NOT NULL,
+  file_url TEXT,
+  storage_path TEXT,
+  submission_type TEXT NOT NULL DEFAULT 'file_upload' CHECK (submission_type IN ('file_upload', 'annotated_resource')),
+  annotation_data JSONB,
+  source_resource_id UUID,
   submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(homework_id, student_id)
+);
+
+-- Homework resources table (scoped to each homework assignment)
+CREATE TABLE public.homework_resources (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  homework_id UUID REFERENCES public.homework(id) ON DELETE CASCADE NOT NULL,
+  teacher_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  storage_path TEXT NOT NULL,
+  page_count INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Annotations table (student notes on lessons)
@@ -91,6 +107,7 @@ ALTER TABLE public.class_enrollments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.lessons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.homework ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.homework_submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.homework_resources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.annotations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.resources ENABLE ROW LEVEL SECURITY;
 
@@ -180,6 +197,31 @@ CREATE POLICY "Teachers can view submissions for their classes" ON public.homewo
     )
   );
 
+-- Homework resources policies
+CREATE POLICY "Teachers can manage homework resources for their lessons" ON public.homework_resources
+  FOR ALL USING (
+    teacher_id = auth.uid() AND
+    EXISTS (
+      SELECT 1
+      FROM public.homework h
+      JOIN public.lessons l ON l.id = h.lesson_id
+      WHERE h.id = homework_resources.homework_id
+        AND l.teacher_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Students can view homework resources from enrolled classes" ON public.homework_resources
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1
+      FROM public.homework h
+      JOIN public.lessons l ON l.id = h.lesson_id
+      JOIN public.class_enrollments ce ON ce.class_id = l.class_id
+      WHERE h.id = homework_resources.homework_id
+        AND ce.student_id = auth.uid()
+    )
+  );
+
 -- Annotations policies
 CREATE POLICY "Students can manage their annotations" ON public.annotations
   FOR ALL USING (student_id = auth.uid());
@@ -198,8 +240,9 @@ CREATE POLICY "Students can view resources from enrolled teachers" ON public.res
   );
 
 -- Create storage buckets
-INSERT INTO storage.buckets (id, name, public) VALUES ('homework-submissions', 'homework-submissions', true);
-INSERT INTO storage.buckets (id, name, public) VALUES ('resources', 'resources', true);
+INSERT INTO storage.buckets (id, name, public) VALUES ('homework-submissions', 'homework-submissions', false);
+INSERT INTO storage.buckets (id, name, public) VALUES ('homework-resources', 'homework-resources', false);
+INSERT INTO storage.buckets (id, name, public) VALUES ('resources', 'resources', false);
 
 -- Storage policies
 CREATE POLICY "Students can upload homework" ON storage.objects
@@ -208,8 +251,50 @@ CREATE POLICY "Students can upload homework" ON storage.objects
     auth.uid()::text = (storage.foldername(name))[1]
   );
 
-CREATE POLICY "Anyone can view homework submissions" ON storage.objects
-  FOR SELECT USING (bucket_id = 'homework-submissions');
+CREATE POLICY "Homework submission owner can read object" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'homework-submissions' AND
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Teachers can read homework submissions for their classes" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'homework-submissions' AND
+    EXISTS (
+      SELECT 1
+      FROM public.homework_submissions hs
+      JOIN public.homework h ON h.id = hs.homework_id
+      JOIN public.lessons l ON l.id = h.lesson_id
+      WHERE hs.storage_path = storage.objects.name
+        AND l.teacher_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Teachers can upload homework resources" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'homework-resources' AND
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Teachers can read own homework resources" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'homework-resources' AND
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Students can read assigned homework resources" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'homework-resources' AND
+    EXISTS (
+      SELECT 1
+      FROM public.homework_resources hr
+      JOIN public.homework h ON h.id = hr.homework_id
+      JOIN public.lessons l ON l.id = h.lesson_id
+      JOIN public.class_enrollments ce ON ce.class_id = l.class_id
+      WHERE hr.storage_path = storage.objects.name
+        AND ce.student_id = auth.uid()
+    )
+  );
 
 CREATE POLICY "Teachers can upload resources" ON storage.objects
   FOR INSERT WITH CHECK (
@@ -217,8 +302,11 @@ CREATE POLICY "Teachers can upload resources" ON storage.objects
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'teacher')
   );
 
-CREATE POLICY "Anyone can view resources" ON storage.objects
-  FOR SELECT USING (bucket_id = 'resources');
+CREATE POLICY "Teachers can read own resources" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'resources' AND
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'teacher')
+  );
 
 -- Function to handle new user registration
 CREATE OR REPLACE FUNCTION public.handle_new_user()
