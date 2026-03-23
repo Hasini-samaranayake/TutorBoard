@@ -198,9 +198,9 @@ export default function ClassesPage() {
 
   function openClass(classId: string) {
     if (profile?.role === 'teacher') {
-      router.push(`/dashboard?class=${classId}`);
+      window.location.href = `/dashboard?class=${classId}`;
     } else {
-      router.push(`/student?class=${classId}`);
+      window.location.href = `/student?class=${classId}`;
     }
   }
 
