@@ -14,7 +14,7 @@ export interface Lesson {
   class_id: string | null;
   title: string;
   lesson_date: string;
-  canvas_data: string | null;
+  canvas_data: string | Record<string, unknown> | null;
   template: string;
   created_at: string;
 }

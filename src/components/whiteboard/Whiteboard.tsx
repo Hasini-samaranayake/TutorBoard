@@ -9,7 +9,7 @@ import EquationEditor from './EquationEditor';
 import { clearCanvas, serializeCanvas, deserializeCanvas } from '@/lib/canvas-utils';
 
 interface WhiteboardProps {
-  initialData?: string;
+  initialData?: string | Record<string, unknown>;
   initialTemplate?: WhiteboardTemplate;
   onSave?: (data: string) => void;
   onChange?: (data: string) => void;
@@ -20,15 +20,30 @@ function generatePageId(): string {
   return `page-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-function parseInitialData(data: string | undefined): { pages: WhiteboardPage[], currentPageIndex: number } {
+function parseInitialData(data: string | Record<string, unknown> | undefined): { pages: WhiteboardPage[], currentPageIndex: number } {
   if (!data) {
     return { pages: [{ id: generatePageId(), canvasData: '' }], currentPageIndex: 0 };
   }
-  
-  try {
-    const parsed = JSON.parse(data);
+
+  if (typeof data === 'object') {
+    const parsed = data as { pages?: WhiteboardPage[]; currentPageIndex?: number };
     if (parsed.pages && Array.isArray(parsed.pages)) {
-      return { pages: parsed.pages, currentPageIndex: parsed.currentPageIndex || 0 };
+      return {
+        pages: parsed.pages.length > 0 ? parsed.pages : [{ id: generatePageId(), canvasData: '' }],
+        currentPageIndex: parsed.currentPageIndex || 0,
+      };
+    }
+
+    return { pages: [{ id: generatePageId(), canvasData: JSON.stringify(data) }], currentPageIndex: 0 };
+  }
+
+  try {
+    const parsed = JSON.parse(data) as { pages?: WhiteboardPage[]; currentPageIndex?: number };
+    if (parsed.pages && Array.isArray(parsed.pages)) {
+      return {
+        pages: parsed.pages.length > 0 ? parsed.pages : [{ id: generatePageId(), canvasData: '' }],
+        currentPageIndex: parsed.currentPageIndex || 0,
+      };
     }
     return { pages: [{ id: generatePageId(), canvasData: data }], currentPageIndex: 0 };
   } catch {
@@ -49,10 +64,17 @@ export default function Whiteboard({ initialData, initialTemplate = 'blank', onS
   const initialParsed = parseInitialData(initialData);
   const [pages, setPages] = useState<WhiteboardPage[]>(initialParsed.pages);
   const [currentPageIndex, setCurrentPageIndex] = useState(initialParsed.currentPageIndex);
+  const pagesRef = useRef<WhiteboardPage[]>(initialParsed.pages);
   
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(-1);
+
+  const syncPages = useCallback((nextPages: WhiteboardPage[]) => {
+    pagesRef.current = nextPages;
+    setPages(nextPages);
+    return nextPages;
+  }, []);
 
   const handleCanvasReady = useCallback((canvas: fabric.Canvas) => {
     canvasRef.current = canvas;
@@ -82,12 +104,13 @@ export default function Whiteboard({ initialData, initialTemplate = 'blank', onS
     if (!canvas) return;
     
     const currentCanvasData = serializeCanvas(canvas);
-    const updatedPages = [...pages];
+    const updatedPages = [...pagesRef.current];
     updatedPages[currentPageIndex] = { ...updatedPages[currentPageIndex], canvasData: currentCanvasData };
+    syncPages(updatedPages);
     
     const data = JSON.stringify({ pages: updatedPages, currentPageIndex });
     onChange(data);
-  }, [onChange, pages, currentPageIndex]);
+  }, [onChange, currentPageIndex, syncPages]);
 
   const handleUndo = useCallback(() => {
     const canvas = canvasRef.current;
@@ -126,82 +149,80 @@ export default function Whiteboard({ initialData, initialTemplate = 'blank', onS
 
   const saveCurrentPage = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return pagesRef.current;
     
     const canvasData = serializeCanvas(canvas);
-    setPages(prev => {
-      const newPages = [...prev];
-      newPages[currentPageIndex] = { ...newPages[currentPageIndex], canvasData };
-      return newPages;
-    });
-    return canvasData;
-  }, [currentPageIndex]);
+    const newPages = [...pagesRef.current];
+    newPages[currentPageIndex] = { ...newPages[currentPageIndex], canvasData };
+    return syncPages(newPages);
+  }, [currentPageIndex, syncPages]);
 
   const handleSave = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !onSave) return;
     
     const currentCanvasData = serializeCanvas(canvas);
-    const updatedPages = [...pages];
+    const updatedPages = [...pagesRef.current];
     updatedPages[currentPageIndex] = { ...updatedPages[currentPageIndex], canvasData: currentCanvasData };
+    syncPages(updatedPages);
     
     const data = JSON.stringify({ pages: updatedPages, currentPageIndex });
     onSave(data);
-  }, [onSave, pages, currentPageIndex]);
+  }, [onSave, currentPageIndex, syncPages]);
 
   const handleAddPage = useCallback(() => {
-    saveCurrentPage();
+    const savedPages = saveCurrentPage();
     const newPage: WhiteboardPage = { id: generatePageId(), canvasData: '' };
-    setPages(prev => [...prev, newPage]);
-    setCurrentPageIndex(pages.length);
+    const updatedPages = syncPages([...savedPages, newPage]);
+    setCurrentPageIndex(updatedPages.length - 1);
     
     const canvas = canvasRef.current;
     if (canvas) {
       clearCanvas(canvas);
     }
-  }, [saveCurrentPage, pages.length]);
+  }, [saveCurrentPage, syncPages]);
 
   const handlePrevPage = useCallback(() => {
     if (currentPageIndex <= 0) return;
     
-    saveCurrentPage();
+    const savedPages = saveCurrentPage();
     const newIndex = currentPageIndex - 1;
     setCurrentPageIndex(newIndex);
     
     const canvas = canvasRef.current;
-    if (canvas && pages[newIndex]) {
+    if (canvas && savedPages[newIndex]) {
       clearCanvas(canvas);
-      if (pages[newIndex].canvasData) {
-        deserializeCanvas(canvas, pages[newIndex].canvasData).catch(console.error);
+      if (savedPages[newIndex].canvasData) {
+        deserializeCanvas(canvas, savedPages[newIndex].canvasData).catch(console.error);
       }
     }
-  }, [currentPageIndex, saveCurrentPage, pages]);
+  }, [currentPageIndex, saveCurrentPage]);
 
   const handleNextPage = useCallback(() => {
     if (currentPageIndex >= pages.length - 1) return;
     
-    saveCurrentPage();
+    const savedPages = saveCurrentPage();
     const newIndex = currentPageIndex + 1;
     setCurrentPageIndex(newIndex);
     
     const canvas = canvasRef.current;
-    if (canvas && pages[newIndex]) {
+    if (canvas && savedPages[newIndex]) {
       clearCanvas(canvas);
-      if (pages[newIndex].canvasData) {
-        deserializeCanvas(canvas, pages[newIndex].canvasData).catch(console.error);
+      if (savedPages[newIndex].canvasData) {
+        deserializeCanvas(canvas, savedPages[newIndex].canvasData).catch(console.error);
       }
     }
-  }, [currentPageIndex, pages, saveCurrentPage]);
+  }, [currentPageIndex, saveCurrentPage]);
 
   const handleDeletePage = useCallback(() => {
     if (pages.length <= 1) return;
     
     if (!confirm('Are you sure you want to delete this page?')) return;
     
-    const newPages = pages.filter((_, i) => i !== currentPageIndex);
+    const newPages = pagesRef.current.filter((_, i) => i !== currentPageIndex);
     const newIndex = Math.min(currentPageIndex, newPages.length - 1);
     
-    setPages(newPages);
+    syncPages(newPages);
     setCurrentPageIndex(newIndex);
     
     const canvas = canvasRef.current;
@@ -211,7 +232,7 @@ export default function Whiteboard({ initialData, initialTemplate = 'blank', onS
         deserializeCanvas(canvas, newPages[newIndex].canvasData).catch(console.error);
       }
     }
-  }, [pages, currentPageIndex]);
+  }, [currentPageIndex, syncPages]);
 
   const handleExport = useCallback(() => {
     const canvas = canvasRef.current;

@@ -13,9 +13,21 @@ import { deserializeCanvas, createPenBrush, createHighlighterBrush, COLORS } fro
 
 type AnnotationTool = 'view' | 'pen' | 'highlighter' | 'eraser';
 
-function parseCanvasData(data: string | null): { pages: WhiteboardPage[]; currentPageIndex: number } {
+function parseCanvasData(data: string | Record<string, unknown> | null): { pages: WhiteboardPage[]; currentPageIndex: number } {
   if (!data) {
     return { pages: [{ id: 'page-1', canvasData: '' }], currentPageIndex: 0 };
+  }
+
+  if (typeof data === 'object') {
+    const parsed = data as { pages?: WhiteboardPage[]; currentPageIndex?: number };
+    if (parsed.pages && Array.isArray(parsed.pages)) {
+      return {
+        pages: parsed.pages.length > 0 ? parsed.pages : [{ id: 'page-1', canvasData: '' }],
+        currentPageIndex: parsed.currentPageIndex || 0,
+      };
+    }
+
+    return { pages: [{ id: 'page-1', canvasData: JSON.stringify(data) }], currentPageIndex: 0 };
   }
 
   try {
