@@ -29,49 +29,7 @@ A cozy place for guided tutoring—bite-sized learning, gentle check-ins, and ro
 - **Database & Auth**: Supabase (PostgreSQL)
 - **Deployment**: Vercel
 
-## Getting Started
 
-### Prerequisites
-
-- Node.js 18+
-- npm or yarn
-- Supabase account
-
-### Installation
-
-1. Clone the repository:
-```bash
-cd whiteboard-app
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Set up environment variables:
-```bash
-cp .env.local.example .env.local
-```
-
-Edit `.env.local` with your Supabase credentials:
-```
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-RESEND_API_KEY=your_resend_api_key (optional, for email notifications)
-```
-
-4. Set up the database:
-   - Go to your Supabase project dashboard
-   - Navigate to SQL Editor
-   - Run the contents of `supabase-schema.sql`
-
-5. Start the development server:
-```bash
-npm run dev
-```
-
-6. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ## Project Structure
 
