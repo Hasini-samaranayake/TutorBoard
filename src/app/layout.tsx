@@ -20,7 +20,7 @@ const sproutSerif = Fraunces({
 export const metadata: Metadata = {
   title: "Sprout - Grow every lesson",
   description:
-    "A cozy place for guided tutoring—bite-sized learning, gentle check-ins, and room to grow at your pace.",
+    "bite-sized learning, gentle check-ins, and room to grow at your pace.",
 };
 
 export default function RootLayout({

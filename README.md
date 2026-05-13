@@ -1,6 +1,6 @@
 # Sprout - Grow every lesson
 
-A cozy place for guided tutoring—bite-sized learning, gentle check-ins, and room to grow at your pace. Built with Next.js, Fabric.js, and Supabase.
+bite-sized learning, gentle check-ins, and room to grow at your pace. Built with Next.js, Fabric.js, and Supabase.
 
 ## all Features
 

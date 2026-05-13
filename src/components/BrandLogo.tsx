@@ -5,12 +5,14 @@ const imageSizes = {
   sm: 24,
   md: 32,
   lg: 48,
+  xl: 80,
 } as const;
 
 const wordmarkSizes = {
   sm: 'text-base',
   md: 'text-xl',
   lg: 'text-2xl',
+  xl: 'text-2xl',
 } as const;
 
 type BrandLogoProps = {
@@ -35,7 +37,7 @@ export default function BrandLogo({
         width={imageSize}
         height={imageSize}
         className="rounded-lg"
-        priority={size === 'lg'}
+        priority={size === 'lg' || size === 'xl'}
       />
       {showWordmark ? (
         <span
