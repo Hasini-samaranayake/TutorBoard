@@ -6,11 +6,15 @@ import Link from 'next/link';
 import { signIn } from '@/lib/auth';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import Card from '@/components/ui/Card';
 import BrandLogo from '@/components/BrandLogo';
+import AuthSplitLayout from '@/components/marketing/AuthSplitLayout';
+import AuthValuePanel, {
+  type AuthAudience,
+} from '@/components/marketing/AuthValuePanel';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [audience, setAudience] = useState<AuthAudience>('student');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,7 +27,7 @@ export default function LoginPage() {
 
     try {
       const data = await signIn(email, password);
-      
+
       if (!data.user) {
         throw new Error('Login failed - no user returned');
       }
@@ -38,22 +42,58 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <Card className="w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center mb-4">
-            <BrandLogo size="lg" showWordmark={false} />
+    <AuthSplitLayout panel={<AuthValuePanel audience={audience} />}>
+      <div className="sprout-auth-card">
+        <div className="mb-8 flex items-center gap-3">
+          <BrandLogo size="md" showWordmark={false} />
+          <div>
+            <p className="sprout-wordmark text-2xl text-[var(--sprout-ink)]">
+              Sprout
+            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700/80">
+              Sign in
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Welcome to Sprout</h1>
-          <p className="text-gray-600 mt-2">Sign in to your account</p>
         </div>
 
+        <p className="mb-6 text-sm text-[var(--sprout-body)]">
+          Sign in to continue. New here?{' '}
+          <Link
+            href={`/auth/register?role=${audience === 'teacher' ? 'teacher' : 'student'}`}
+            className="font-medium text-[var(--sprout-ink)] underline-offset-2 hover:underline"
+          >
+            Create an account
+          </Link>
+        </p>
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          <div>
+            <p className="mb-2 text-sm font-medium text-gray-700">
+              I am signing in as a
+            </p>
+            <div className="sprout-role-toggle">
+              <button
+                type="button"
+                data-active={audience === 'student'}
+                onClick={() => setAudience('student')}
+              >
+                Student
+              </button>
+              <button
+                type="button"
+                data-active={audience === 'teacher'}
+                onClick={() => setAudience('teacher')}
+              >
+                Tutor
+              </button>
+            </div>
+          </div>
+
+          {error ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
               {error}
             </div>
-          )}
+          ) : null}
 
           <Input
             id="email"
@@ -78,24 +118,21 @@ export default function LoginPage() {
           <div className="flex items-center justify-between">
             <Link
               href="/auth/forgot-password"
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-[var(--sprout-ink)] hover:underline"
             >
               Forgot password?
             </Link>
           </div>
 
-          <Button type="submit" className="w-full" isLoading={isLoading}>
-            Sign In
+          <Button
+            type="submit"
+            className="w-full rounded-full bg-[var(--sprout-ink)] hover:bg-[#0b3f39] focus:ring-[var(--sprout-ink)]"
+            isLoading={isLoading}
+          >
+            Sign in
           </Button>
         </form>
-
-        <p className="text-center text-gray-600 mt-6">
-          Don&apos;t have an account?{' '}
-          <Link href="/auth/register" className="text-blue-600 hover:underline font-medium">
-            Sign up
-          </Link>
-        </p>
-      </Card>
-    </div>
+      </div>
+    </AuthSplitLayout>
   );
 }

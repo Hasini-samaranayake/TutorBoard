@@ -38,7 +38,9 @@ export default function BrandLogo({
         priority={size === 'lg'}
       />
       {showWordmark ? (
-        <span className={`font-bold text-gray-900 ${wordmarkSizes[size]}`}>
+        <span
+          className={`sprout-wordmark text-[var(--sprout-ink)] ${wordmarkSizes[size]}`}
+        >
           Sprout
         </span>
       ) : null}

@@ -1,18 +1,28 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signUp } from '@/lib/auth';
 import { UserRole } from '@/types';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import Card from '@/components/ui/Card';
 import BrandLogo from '@/components/BrandLogo';
-import { GraduationCap, Users } from 'lucide-react';
+import AuthSplitLayout from '@/components/marketing/AuthSplitLayout';
+import AuthValuePanel from '@/components/marketing/AuthValuePanel';
 
-export default function RegisterPage() {
-  const router = useRouter();
+function RegisterPageFallback() {
+  return (
+    <div className="sprout-page-bg flex min-h-screen items-center justify-center px-4 py-12">
+      <div className="sprout-auth-card w-full max-w-md text-center text-[var(--sprout-body)]">
+        Loading...
+      </div>
+    </div>
+  );
+}
+
+function RegisterPageContent() {
+  const searchParams = useSearchParams();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +31,13 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    const initialRole = searchParams.get('role');
+    if (initialRole === 'teacher' || initialRole === 'student') {
+      setRole(initialRole);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,78 +67,93 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-        <Card className="w-full max-w-md p-8 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+      <div className="sprout-page-bg flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="sprout-auth-card w-full max-w-md text-center">
+          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[var(--sprout-mint)]">
+            <svg
+              className="h-8 w-8 text-[var(--sprout-ink)]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h1>
-          <p className="text-gray-600 mb-6">
-            We&apos;ve sent a confirmation link to <strong>{email}</strong>. 
+          <h1 className="sprout-wordmark text-2xl text-[var(--sprout-ink)]">
+            Check your email
+          </h1>
+          <p className="mt-3 text-[var(--sprout-body)]">
+            We&apos;ve sent a confirmation link to <strong>{email}</strong>.
             Please click the link to verify your account.
           </p>
-          <Link href="/auth/login">
-            <Button variant="secondary" className="w-full">
-              Back to Login
+          <Link href="/auth/login" className="mt-6 block">
+            <Button
+              variant="secondary"
+              className="w-full rounded-full border border-gray-200"
+            >
+              Back to sign in
             </Button>
           </Link>
-        </Card>
+        </div>
       </div>
     );
   }
 
+  const audience = role === 'teacher' ? 'teacher' : 'student';
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <Card className="w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center mb-4">
-            <BrandLogo size="lg" showWordmark={false} />
+    <AuthSplitLayout panel={<AuthValuePanel audience={audience} />}>
+      <div className="sprout-auth-card">
+        <div className="mb-8 flex items-center gap-3">
+          <BrandLogo size="md" showWordmark={false} />
+          <div>
+            <p className="sprout-wordmark text-2xl text-[var(--sprout-ink)]">
+              Sprout
+            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700/80">
+              Create account
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
-          <p className="text-gray-600 mt-2">Join Sprout today</p>
         </div>
 
+        <p className="mb-6 text-sm text-[var(--sprout-body)]">
+          Join Sprout today. Already have an account?{' '}
+          <Link
+            href="/auth/login"
+            className="font-medium text-[var(--sprout-ink)] underline-offset-2 hover:underline"
+          >
+            Sign in
+          </Link>
+        </p>
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          {error ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
               {error}
             </div>
-          )}
+          ) : null}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              I am a...
-            </label>
-            <div className="grid grid-cols-2 gap-3">
+            <p className="mb-2 text-sm font-medium text-gray-700">I am a</p>
+            <div className="sprout-role-toggle">
               <button
                 type="button"
-                onClick={() => setRole('teacher')}
-                className={`flex flex-col items-center p-4 rounded-lg border-2 transition-colors ${
-                  role === 'teacher'
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+                data-active={role === 'student'}
+                onClick={() => setRole('student')}
               >
-                <GraduationCap className={`w-8 h-8 mb-2 ${role === 'teacher' ? 'text-blue-600' : 'text-gray-400'}`} />
-                <span className={`font-medium ${role === 'teacher' ? 'text-blue-600' : 'text-gray-600'}`}>
-                  Teacher
-                </span>
+                Student
               </button>
               <button
                 type="button"
-                onClick={() => setRole('student')}
-                className={`flex flex-col items-center p-4 rounded-lg border-2 transition-colors ${
-                  role === 'student'
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+                data-active={role === 'teacher'}
+                onClick={() => setRole('teacher')}
               >
-                <Users className={`w-8 h-8 mb-2 ${role === 'student' ? 'text-blue-600' : 'text-gray-400'}`} />
-                <span className={`font-medium ${role === 'student' ? 'text-blue-600' : 'text-gray-600'}`}>
-                  Student
-                </span>
+                Tutor
               </button>
             </div>
           </div>
@@ -166,18 +198,23 @@ export default function RegisterPage() {
             required
           />
 
-          <Button type="submit" className="w-full" isLoading={isLoading}>
-            Create Account
+          <Button
+            type="submit"
+            className="w-full rounded-full bg-[var(--sprout-ink)] hover:bg-[#0b3f39] focus:ring-[var(--sprout-ink)]"
+            isLoading={isLoading}
+          >
+            Create account
           </Button>
         </form>
+      </div>
+    </AuthSplitLayout>
+  );
+}
 
-        <p className="text-center text-gray-600 mt-6">
-          Already have an account?{' '}
-          <Link href="/auth/login" className="text-blue-600 hover:underline font-medium">
-            Sign in
-          </Link>
-        </p>
-      </Card>
-    </div>
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<RegisterPageFallback />}>
+      <RegisterPageContent />
+    </Suspense>
   );
 }
