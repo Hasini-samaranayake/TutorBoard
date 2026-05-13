@@ -68,7 +68,7 @@ export default function Home() {
     <div className="sprout-page-bg min-h-screen px-6 py-12">
       <main className="mx-auto flex w-full max-w-5xl flex-col items-center">
         <section className="flex w-full max-w-xl flex-col items-center text-center">
-          <BrandLogo size="xl" showWordmark={false} className="mb-6" />
+          <BrandLogo size="hero" showWordmark={false} className="mb-6" />
           <h1 className="sprout-wordmark text-5xl text-[var(--sprout-ink)] sm:text-6xl">
             Sprout
           </h1>
@@ -114,7 +114,7 @@ export default function Home() {
           <div className="grid items-center gap-8 md:grid-cols-2">
             <div className="text-left">
               <h2 className="sprout-wordmark text-3xl text-[var(--sprout-ink)]">
-                Built for tutoring, not generic whiteboards
+                Built for tutors, by tutors
               </h2>
               <p className="mt-4 text-[var(--sprout-body)]">
                 Sprout keeps lessons, homework, and student follow-up in one
