@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TutorBoard - Interactive Whiteboard for Tutoring",
-  description: "A powerful whiteboard application designed for private tutors to deliver engaging online lessons",
+  title: "Sprout - Grow every lesson",
+  description:
+    "A cozy place for guided tutoring—bite-sized learning, gentle check-ins, and room to grow at your pace.",
 };
 
 export default function RootLayout({

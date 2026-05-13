@@ -1,6 +1,6 @@
-# TutorBoard - Interactive Whiteboard for Tutoring
+# Sprout - Grow every lesson
 
-A powerful whiteboard application designed specifically for private tutors to deliver engaging online lessons. Built with Next.js, Fabric.js, and Supabase.
+A cozy place for guided tutoring—bite-sized learning, gentle check-ins, and room to grow at your pace. Built with Next.js, Fabric.js, and Supabase.
 
 ## all Features
 

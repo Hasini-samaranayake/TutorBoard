@@ -6,7 +6,8 @@ import { resetPassword } from '@/lib/auth';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Card from '@/components/ui/Card';
-import { BookOpen, ArrowLeft } from 'lucide-react';
+import BrandLogo from '@/components/BrandLogo';
+import { ArrowLeft } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -64,8 +65,8 @@ export default function ForgotPasswordPage() {
         </Link>
 
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-            <BookOpen className="w-8 h-8 text-blue-600" />
+          <div className="inline-flex items-center justify-center mb-4">
+            <BrandLogo size="lg" showWordmark={false} />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Forgot your password?</h1>
           <p className="text-gray-600 mt-2">

@@ -66,7 +66,7 @@ export async function POST() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              from: 'TutorBoard <notifications@tutorboard.app>',
+              from: 'Sprout <notifications@tutorboard.app>',
               to: notification.studentEmail,
               subject: `Reminder: Homework due tomorrow - ${notification.homeworkDescription}`,
               html: `
@@ -81,7 +81,7 @@ export async function POST() {
                   </div>
                   <p>Don't forget to submit your work before the deadline!</p>
                   <p style="color: #6b7280; font-size: 14px; margin-top: 24px;">
-                    - The TutorBoard Team
+                    - The Sprout Team
                   </p>
                 </div>
               `,

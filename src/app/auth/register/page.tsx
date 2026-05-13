@@ -8,7 +8,8 @@ import { UserRole } from '@/types';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Card from '@/components/ui/Card';
-import { BookOpen, GraduationCap, Users } from 'lucide-react';
+import BrandLogo from '@/components/BrandLogo';
+import { GraduationCap, Users } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -75,11 +76,11 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-            <BookOpen className="w-8 h-8 text-blue-600" />
+          <div className="inline-flex items-center justify-center mb-4">
+            <BrandLogo size="lg" showWordmark={false} />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
-          <p className="text-gray-600 mt-2">Join TutorBoard today</p>
+          <p className="text-gray-600 mt-2">Join Sprout today</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

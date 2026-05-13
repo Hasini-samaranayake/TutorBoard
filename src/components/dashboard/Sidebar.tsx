@@ -2,17 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  BookOpen, 
-  Users, 
-  FileText, 
+import {
+  LayoutDashboard,
+  BookOpen,
+  Users,
+  FileText,
   LogOut,
   Settings,
   ArrowLeftRight,
   Copy,
-  Check
+  Check,
 } from 'lucide-react';
+import BrandLogo from '@/components/BrandLogo';
 import { signOut } from '@/lib/auth';
 import { useClass } from '@/contexts/ClassContext';
 import { useState } from 'react';
@@ -53,10 +54,7 @@ export default function Sidebar() {
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
       <div className="p-6 border-b border-gray-200">
-        <Link href={getHrefWithClass('/dashboard')} className="flex items-center gap-2">
-          <BookOpen className="w-8 h-8 text-blue-600" />
-          <span className="text-xl font-bold text-gray-900">TutorBoard</span>
-        </Link>
+        <BrandLogo href={getHrefWithClass('/dashboard')} size="md" />
       </div>
 
       {currentClass && (

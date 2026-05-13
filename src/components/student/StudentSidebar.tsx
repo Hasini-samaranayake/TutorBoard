@@ -10,6 +10,7 @@ import {
   LogOut,
   ArrowLeftRight
 } from 'lucide-react';
+import BrandLogo from '@/components/BrandLogo';
 import { signOut } from '@/lib/auth';
 import { useClass } from '@/contexts/ClassContext';
 
@@ -40,10 +41,7 @@ export default function StudentSidebar() {
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
       <div className="p-6 border-b border-gray-200">
-        <Link href={getHrefWithClass('/student')} className="flex items-center gap-2">
-          <BookOpen className="w-8 h-8 text-blue-600" />
-          <span className="text-xl font-bold text-gray-900">TutorBoard</span>
-        </Link>
+        <BrandLogo href={getHrefWithClass('/student')} size="md" />
       </div>
 
       {currentClass && (

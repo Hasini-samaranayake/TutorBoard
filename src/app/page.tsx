@@ -1,15 +1,13 @@
 import Link from 'next/link';
 import { BookOpen, Pencil, Users, Clock, FileText, BarChart } from 'lucide-react';
+import BrandLogo from '@/components/BrandLogo';
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <nav className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-8 h-8 text-blue-600" />
-            <span className="text-xl font-bold text-gray-900">TutorBoard</span>
-          </div>
+          <BrandLogo size="md" />
           <div className="flex items-center gap-4">
             <Link
               href="/auth/login"
@@ -30,13 +28,12 @@ export default function Home() {
       <main className="container mx-auto px-6 py-16">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            The Interactive Whiteboard
-            <span className="text-blue-600"> Built for Tutors</span>
+            Sprout
+            <span className="text-blue-600"> — Grow every lesson</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Deliver engaging online lessons with a powerful whiteboard designed specifically 
-            for private tutoring. Draw, write equations, manage homework, and track student progress 
-            all in one place.
+            A cozy place for guided tutoring—bite-sized learning, gentle check-ins,
+            and room to grow at your pace.
           </p>
           <div className="flex items-center justify-center gap-4">
             <Link
@@ -94,7 +91,7 @@ export default function Home() {
                 Designed for Mathematics Tutoring
               </h2>
               <p className="text-gray-600 mb-6">
-                Unlike generic whiteboard tools, TutorBoard is built from the ground up for 
+                Unlike generic whiteboard tools, Sprout is built from the ground up for
                 tutors. With math-first features like equation editors, graph paper templates, 
                 and coordinate planes, you can focus on teaching instead of fighting with tools.
               </p>
@@ -137,10 +134,7 @@ export default function Home() {
 
       <footer className="container mx-auto px-6 py-8 border-t border-gray-200 mt-16">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-6 h-6 text-blue-600" />
-            <span className="font-semibold text-gray-900">TutorBoard</span>
-          </div>
+          <BrandLogo size="sm" />
           <p className="text-gray-500 text-sm">
             Built for tutors, by tutors.
           </p>
