@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { BookOpen, Heart, Sparkles, Users } from 'lucide-react';
+import { studentHighlights } from '@/lib/marketing-copy';
 
 export type AuthAudience = 'student' | 'teacher';
 
@@ -18,7 +19,7 @@ const audienceCopy: Record<
     features: [
       {
         icon: BookOpen,
-        text: 'Short, step-by-step lessons you can finish in one sitting.',
+        text: studentHighlights[0],
       },
       {
         icon: Sparkles,
